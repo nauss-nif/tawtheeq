@@ -1,11 +1,13 @@
 import { createClient } from '@/lib/supabase/server';
 import type { Course, Media } from '@/lib/database.types';
+import { fetchLandmarkImage } from './landmark';
 
 export interface MagazineData {
   course: Course;
   cover: Media | null;
   images: Media[];
   videos: Media[];
+  landmarkUrl: string | null; // صورة معلم المدينة (تلقائية)
 }
 
 /**
@@ -39,5 +41,8 @@ export async function getMagazineBySlug(slug: string): Promise<MagazineData | nu
   const images = all.filter((m) => m.type === 'image' && !m.is_low_quality);
   const videos = all.filter((m) => m.type === 'video');
 
-  return { course, cover, images, videos };
+  // صورة معلم المدينة تلقائيًا حسب مكان الدورة
+  const landmarkUrl = course.location ? await fetchLandmarkImage(course.location) : null;
+
+  return { course, cover, images, videos, landmarkUrl };
 }

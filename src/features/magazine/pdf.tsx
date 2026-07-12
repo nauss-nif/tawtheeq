@@ -57,13 +57,15 @@ const styles = StyleSheet.create({
 });
 
 export function MagazinePDF({ data }: { data: MagazineData }) {
-  const { course, cover, images } = data;
+  const { course, cover, images, landmarkUrl } = data;
+  // خلفية غلاف الـ PDF: صورة معلم المدينة تلقائيًا، وإلا صورة غلاف الدورة
+  const coverBg = landmarkUrl ?? cover?.processed_url;
   return (
     <Document title={course.title} author="إدارة عمليات التدريب">
       {/* الغلاف */}
       <Page size="A4" style={styles.page}>
         <View style={styles.cover}>
-          {cover?.processed_url && <Image src={cover.processed_url} style={styles.coverImg} />}
+          {coverBg && <Image src={coverBg} style={styles.coverImg} />}
           <View style={styles.overlay} />
           <View>
             <View style={styles.accent} />

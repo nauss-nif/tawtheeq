@@ -16,7 +16,9 @@ const NAV = [
 ];
 
 export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: string }) {
-  const { course, cover, images, videos } = data;
+  const { course, cover, images, videos, landmarkUrl } = data;
+  // خلفية الغلاف: صورة معلم المدينة تلقائيًا، وإلا صورة غلاف الدورة
+  const heroBg = landmarkUrl ?? cover?.processed_url ?? null;
   const tpl = TEMPLATES[course.template_id];
   const [scrolled, setScrolled] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
@@ -97,11 +99,17 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
 
       {/* غلاف hero */}
       <header className={cn('relative flex h-[85vh] min-h-[520px] items-end overflow-hidden', tpl.hero)}>
-        {cover?.processed_url && (
+        {heroBg && (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={cover.processed_url} alt={course.title} className="absolute inset-0 size-full object-cover" />
+          <img src={heroBg} alt={course.title} className="absolute inset-0 size-full object-cover" />
         )}
         <div className={cn('absolute inset-0', tpl.heroOverlay)} />
+        {/* إسناد المصدر عند استخدام صورة معلم من ويكيبيديا */}
+        {landmarkUrl && (
+          <span className="absolute bottom-2 left-3 z-10 text-[10px] text-white/60">
+            الصورة: ويكيميديا
+          </span>
+        )}
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 text-white">
           <div className={cn('mb-4 h-1.5 w-24 rounded-full', tpl.accent)} />
           <h1 className={tpl.heroTitle}>{course.title}</h1>
