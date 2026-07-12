@@ -1,0 +1,95 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ==========================================================================
+   نظام التصميم — متغيرات CSS (مصدر واحد للحقيقة، متطابق مع tailwind.config)
+   ========================================================================== */
+:root {
+  --primary: #0e5c50;
+  --primary-dark: #0a4a40;
+  --secondary: #b99c6b;
+  --background: #f6f2ea;
+  --surface: #ffffff;
+
+  --state-danger: #8e3b4a;
+  --state-warning: #d9a441;
+  --state-info: #3e7c8f;
+  --chart-navy: #33567d;
+  --chart-olive: #6e7645;
+  --muted: #8b8178;
+
+  --focus-ring: var(--secondary);
+}
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background-color: var(--background);
+    color: #1c211f;
+    font-size: 16px;
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* أرقام الإحصائيات: كبيرة وبولد وبالأخضر الأساسي */
+  .stat-number {
+    @apply font-bold text-primary;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* فاصل ذهبي رفيع أسفل العناوين الرئيسية — لمسة الهوية */
+  .heading-accent {
+    @apply relative pb-3;
+  }
+  .heading-accent::after {
+    content: '';
+    @apply absolute bottom-0 right-0 h-[3px] w-16 rounded-full;
+    background-color: var(--secondary);
+  }
+
+  /* focus ring ذهبي واضح لإمكانية الوصول */
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+}
+
+@layer components {
+  /* skeleton loading كريمي */
+  .skeleton {
+    @apply relative overflow-hidden rounded-xl bg-[#ece6d9];
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0;
+    background: linear-gradient(
+      90deg,
+      transparent,
+      rgba(255, 255, 255, 0.5),
+      transparent
+    );
+    animation: shimmer 1.6s infinite;
+  }
+  @keyframes shimmer {
+    100% {
+      transform: translateX(-100%);
+    }
+  }
+}
+
+/* احترام تفضيل تقليل الحركة */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

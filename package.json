@@ -1,0 +1,49 @@
+{
+  "name": "tawtheeq",
+  "version": "0.1.0",
+  "private": true,
+  "description": "منصة توثيق - إدارة وتوثيق صور وفيديوهات الدورات التدريبية وإنتاج مجلة إلكترونية لكل دورة",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint",
+    "seed:admin": "tsx scripts/seed-admin.ts",
+    "worker:media": "tsx scripts/media-worker.ts"
+  },
+  "dependencies": {
+    "@azure/msal-node": "^2.16.2",
+    "@react-pdf/renderer": "^3.4.4",
+    "@supabase/ssr": "^0.12.0",
+    "@supabase/supabase-js": "^2.45.4",
+    "clsx": "^2.1.1",
+    "framer-motion": "^11.11.9",
+    "lucide-react": "^0.454.0",
+    "next": "14.2.15",
+    "page-flip": "^2.0.7",
+    "qrcode": "^1.5.4",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-dropzone": "^14.2.9",
+    "sharp": "^0.33.5",
+    "sonner": "^1.5.0",
+    "tailwind-merge": "^2.5.4",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/fluent-ffmpeg": "^2.1.28",
+    "@types/node": "^20.16.11",
+    "@types/qrcode": "^1.5.5",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.0",
+    "autoprefixer": "^10.4.20",
+    "dotenv": "^17.4.2",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "14.2.15",
+    "fluent-ffmpeg": "^2.1.3",
+    "postcss": "^8.4.47",
+    "tailwindcss": "^3.4.14",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  }
+}

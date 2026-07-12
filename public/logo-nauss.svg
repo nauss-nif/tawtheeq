@@ -1,0 +1,7 @@
+<svg width="160" height="48" viewBox="0 0 160 48" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="شعار جامعة نايف العربية للعلوم الأمنية">
+  <!-- شعار مؤقت (placeholder) — يُستبدل بشعار الجامعة الرسمي -->
+  <rect x="0" y="4" width="40" height="40" rx="10" fill="#0E5C50"/>
+  <path d="M20 12 L28 17 V25 C28 30 24 33 20 35 C16 33 12 30 12 25 V17 Z" fill="#B99C6B"/>
+  <text x="50" y="22" font-family="'IBM Plex Sans Arabic', sans-serif" font-size="15" font-weight="700" fill="#0E5C50">توثيق</text>
+  <text x="50" y="38" font-family="'IBM Plex Sans Arabic', sans-serif" font-size="9" fill="#8B8178">جامعة نايف العربية</text>
+</svg>
