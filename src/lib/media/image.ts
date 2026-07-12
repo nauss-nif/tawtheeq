@@ -36,10 +36,13 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
   // عتبات تجريبية: سطوع منخفض جدًا أو تباين شبه معدوم
   const isLowQuality = meanBrightness < 40 || meanStdev < 12;
 
+  // تحسين احترافي تلقائي للصورة: موازنة الإضاءة والتباين، رفع خفيف للتشبّع، وزيادة الوضوح
   const pipeline = base
     .clone()
     .resize({ width: MAX_DIMENSION, height: MAX_DIMENSION, fit: 'inside', withoutEnlargement: true })
-    .normalize(); // تحسين الإضاءة والألوان
+    .normalize() // موازنة التباين والإضاءة تلقائيًا
+    .modulate({ brightness: 1.02, saturation: 1.08 }) // إشراق وحيوية ألوان معتدلة
+    .sharpen({ sigma: 0.7 }); // زيادة الوضوح بلطف
 
   // جودة متكيّفة: ابدأ 82% وخفّض تدريجيًا حتى ≤ 800KB
   let quality = 82;
@@ -52,6 +55,9 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
   const large = await base
     .clone()
     .resize({ width: 1200, fit: 'inside', withoutEnlargement: true })
+    .normalize()
+    .modulate({ brightness: 1.02, saturation: 1.08 })
+    .sharpen({ sigma: 0.7 })
     .webp({ quality: 78 })
     .toBuffer();
 

@@ -110,8 +110,20 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
             الصورة: ويكيميديا
           </span>
         )}
+        {/* شريط الشعارين أعلى الغلاف */}
+        <div className="absolute inset-x-0 top-14 z-10 flex justify-center px-4">
+          <div className="flex items-center gap-4 rounded-2xl bg-white/95 px-5 py-2.5 shadow-soft">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-moi.png" alt="وزارة الداخلية — برامج الشراكات الدولية" className="h-9 object-contain sm:h-10" />
+            <span className="h-8 w-px bg-muted/30" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-nauss.png" alt="جامعة نايف العربية للعلوم الأمنية" className="h-9 object-contain sm:h-10" />
+          </div>
+        </div>
+
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 text-white">
           <div className={cn('mb-4 h-1.5 w-24 rounded-full', tpl.accent)} />
+          <p className="mb-2 text-sm font-medium text-secondary">برامج الشراكات الدولية</p>
           <h1 className={tpl.heroTitle}>{course.title}</h1>
           <div className="mt-4 flex flex-wrap gap-4 text-white/90">
             {course.start_date && (
@@ -190,8 +202,15 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
 
         {/* خاتمة */}
         <footer className="mt-16 rounded-2xl bg-primary p-10 text-center text-white">
-          <img src="/logo-nauss.svg" alt="شعار الجامعة" className="mx-auto mb-4 h-12 brightness-0 invert" />
-          <p className="text-lg">إدارة عمليات التدريب</p>
+          <div className="mx-auto mb-5 flex w-fit items-center gap-5 rounded-2xl bg-white px-6 py-4">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-moi.png" alt="وزارة الداخلية" className="h-12 object-contain" />
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-nauss.png" alt="جامعة نايف" className="h-12 object-contain" />
+          </div>
+          <p className="text-lg font-semibold">إدارة عمليات التدريب</p>
+          <p className="mt-1 text-sm text-white/70">جامعة نايف العربية للعلوم الأمنية</p>
+          <p className="mt-0.5 text-xs text-white/50">برامج الشراكات الدولية — وزارة الداخلية</p>
           <div className={cn('mx-auto mt-3 h-1 w-16 rounded-full', tpl.accent)} />
         </footer>
       </main>
