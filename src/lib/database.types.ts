@@ -76,6 +76,18 @@ type TableDef<Row, Insert> = {
   Relationships: [];
 };
 
+export type Session = {
+  id: string;
+  course_id: string;
+  title: string;
+  presenter: string | null;
+  session_date: string | null;
+  time_label: string | null;
+  description: string | null;
+  sort_order: number;
+  created_at: string;
+};
+
 export interface Database {
   public: {
     Tables: {
@@ -83,6 +95,7 @@ export interface Database {
       courses: TableDef<Course, Partial<Course> & { coordinator_id: string; title: string }>;
       media: TableDef<Media, Partial<Media> & { course_id: string; type: MediaType }>;
       magazine_sections: TableDef<MagazineSection, Partial<MagazineSection> & { course_id: string; type: SectionType }>;
+      sessions: TableDef<Session, Partial<Session> & { course_id: string; title: string }>;
     };
     Views: Record<string, never>;
     Functions: {

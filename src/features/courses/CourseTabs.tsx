@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 const tabs = [
   { id: 'details', label: 'البيانات' },
   { id: 'media', label: 'الوسائط' },
+  { id: 'sessions', label: 'الجلسات' },
   { id: 'magazine', label: 'المجلة والنشر' },
 ] as const;
 
@@ -14,10 +15,11 @@ type TabId = (typeof tabs)[number]['id'];
 export function CourseTabs({
   details,
   media,
+  sessions,
   magazine,
-}: Record<'details' | 'media' | 'magazine', React.ReactNode>) {
+}: Record<'details' | 'media' | 'sessions' | 'magazine', React.ReactNode>) {
   const [active, setActive] = useState<TabId>('details');
-  const content = { details, media, magazine };
+  const content = { details, media, sessions, magazine };
 
   return (
     <div>

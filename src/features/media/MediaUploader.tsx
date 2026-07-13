@@ -6,7 +6,8 @@ import { UploadCloud, Camera, Loader2, CheckCircle2, XCircle } from 'lucide-reac
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { UPLOAD_LIMITS } from '@/lib/validations';
-import { cn, formatBytes } from '@/lib/utils';
+import { cn } from '@/lib/utils';
+import { uploadVideoDirect } from './videoUpload';
 
 interface UploadItem {
   id: string;
@@ -25,11 +26,32 @@ export function MediaUploader({ courseId }: { courseId: string }) {
   const [items, setItems] = useState<UploadItem[]>([]);
 
   const uploadOne = useCallback(
-    (file: File): Promise<void> =>
-      new Promise((resolve) => {
-        const id = crypto.randomUUID();
-        setItems((prev) => [...prev, { id, name: file.name, progress: 0, status: 'uploading' }]);
+    (file: File): Promise<void> => {
+      const id = crypto.randomUUID();
+      const isVideo = file.type.startsWith('video/');
 
+      const setItem = (patch: Partial<UploadItem>) =>
+        setItems((prev) => prev.map((it) => (it.id === id ? { ...it, ...patch } : it)));
+
+      setItems((prev) => [...prev, { id, name: file.name, progress: 0, status: 'uploading' }]);
+
+      // الفيديو: رفع مباشر من المتصفح إلى التخزين (يتجاوز حدود الخادم)
+      if (isVideo) {
+        if (file.size > UPLOAD_LIMITS.maxVideoBytes) {
+          setItem({ status: 'error', error: 'حجم الفيديو يتجاوز 200 ميغابايت' });
+          toast.error('حجم الفيديو يتجاوز 200 ميغابايت');
+          return Promise.resolve();
+        }
+        return uploadVideoDirect(courseId, file, (pct) => setItem({ progress: pct }))
+          .then(() => setItem({ progress: 100, status: 'done' }))
+          .catch((e) => {
+            setItem({ status: 'error', error: e?.message ?? 'فشل الرفع' });
+            toast.error(e?.message ?? 'فشل رفع الفيديو');
+          });
+      }
+
+      // الصور: عبر الخادم (معالجة Sharp)
+      return new Promise((resolve) => {
         const form = new FormData();
         form.append('file', file);
 
@@ -63,7 +85,8 @@ export function MediaUploader({ courseId }: { courseId: string }) {
           resolve();
         };
         xhr.send(form);
-      }),
+      });
+    },
     [courseId],
   );
 

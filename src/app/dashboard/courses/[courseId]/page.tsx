@@ -11,6 +11,7 @@ import { CourseTabs } from '@/features/courses/CourseTabs';
 import { PublishPanel } from '@/features/courses/PublishPanel';
 import { MediaUploader } from '@/features/media/MediaUploader';
 import { MediaGrid } from '@/features/media/MediaGrid';
+import { SessionsManager } from '@/features/sessions/SessionsManager';
 
 export default async function CourseDetailPage({ params }: { params: { courseId: string } }) {
   await requireProfile();
@@ -25,6 +26,12 @@ export default async function CourseDetailPage({ params }: { params: { courseId:
 
   const { data: media } = await supabase
     .from('media')
+    .select('*')
+    .eq('course_id', course.id)
+    .order('sort_order', { ascending: true });
+
+  const { data: sessions } = await supabase
+    .from('sessions')
     .select('*')
     .eq('course_id', course.id)
     .order('sort_order', { ascending: true });
@@ -54,6 +61,7 @@ export default async function CourseDetailPage({ params }: { params: { courseId:
             </Card>
           </div>
         }
+        sessions={<SessionsManager courseId={course.id} initial={sessions ?? []} />}
         magazine={
           <div className="flex flex-col gap-6">
             <PublishPanel course={course} siteUrl={publicEnv.siteUrl} />

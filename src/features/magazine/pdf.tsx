@@ -7,7 +7,7 @@ import {
   StyleSheet,
   Font,
 } from '@react-pdf/renderer';
-import type { Course } from '@/lib/database.types';
+import type { Course, Session } from '@/lib/database.types';
 
 /**
  * توليد PDF احترافي بهوية جامعة نايف وبرامج الشراكات الدولية.
@@ -74,6 +74,10 @@ const s = StyleSheet.create({
   card: { width: '48%', marginBottom: 14, backgroundColor: C.surface, borderRadius: 8, overflow: 'hidden', border: `1px solid ${C.secondary}55` },
   cardImg: { width: '100%', height: 150, objectFit: 'cover' },
   caption: { fontSize: 9.5, color: C.muted, padding: 6, textAlign: 'right' },
+  session: { marginBottom: 10, paddingRight: 10, borderRight: `2px solid ${C.secondary}`, borderRightStyle: 'solid' },
+  sessionTitle: { fontSize: 12.5, fontWeight: 600, color: C.primary, textAlign: 'right' },
+  sessionMeta: { fontSize: 10, color: C.muted, textAlign: 'right', marginTop: 2 },
+  sessionDesc: { fontSize: 11, color: C.ink, lineHeight: 1.8, textAlign: 'right', marginTop: 3 },
   closing: { flex: 1, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', padding: 40 },
   closingLogos: { flexDirection: 'row', gap: 24, alignItems: 'center', backgroundColor: '#fff', borderRadius: 12, padding: 16, marginBottom: 24 },
   closingLogo: { height: 54, objectFit: 'contain' },
@@ -81,7 +85,15 @@ const s = StyleSheet.create({
   closingSub: { color: '#ffffffaa', fontSize: 11, marginTop: 4 },
 });
 
-export function MagazinePDF({ course, assets }: { course: Course; assets: PdfAssets }) {
+export function MagazinePDF({
+  course,
+  sessions,
+  assets,
+}: {
+  course: Course;
+  sessions: Session[];
+  assets: PdfAssets;
+}) {
   ensureFonts(assets);
   const dateText = [course.start_date, course.end_date].filter(Boolean).join(' - ');
 
@@ -122,6 +134,22 @@ export function MagazinePDF({ course, assets }: { course: Course; assets: PdfAss
               <Text style={s.h2}>المدربون</Text>
               <View style={s.hr} />
               <Text style={s.para}>{course.trainer_names.join('  -  ')}</Text>
+            </View>
+          ) : null}
+
+          {sessions.length > 0 ? (
+            <View style={{ marginBottom: 22 }}>
+              <Text style={s.h2}>الجدول الزمني</Text>
+              <View style={s.hr} />
+              {sessions.map((sn) => (
+                <View key={sn.id} style={s.session} wrap={false}>
+                  <Text style={s.sessionTitle}>
+                    {sn.time_label ? `${sn.time_label}  -  ` : ''}{sn.title}
+                  </Text>
+                  {sn.presenter ? <Text style={s.sessionMeta}>المقدّم: {sn.presenter}</Text> : null}
+                  {sn.description ? <Text style={s.sessionDesc}>{sn.description}</Text> : null}
+                </View>
+              ))}
             </View>
           ) : null}
 

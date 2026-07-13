@@ -10,13 +10,14 @@ import { Flipbook } from './Flipbook';
 
 const NAV = [
   { id: 'intro', label: 'تعريف' },
+  { id: 'sessions', label: 'الجلسات' },
   { id: 'gallery', label: 'المعرض' },
   { id: 'videos', label: 'الفيديو' },
   { id: 'trainers', label: 'المدربون' },
 ];
 
 export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: string }) {
-  const { course, cover, images, videos, landmarkUrl } = data;
+  const { course, cover, images, videos, sessions, landmarkUrl } = data;
   // خلفية الغلاف: صورة معلم المدينة تلقائيًا، وإلا صورة غلاف الدورة
   const heroBg = landmarkUrl ?? cover?.processed_url ?? null;
   const tpl = TEMPLATES[course.template_id];
@@ -145,6 +146,42 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
         {course.description && (
           <Section id="intro" title="عن الدورة" tpl={tpl}>
             <p className="whitespace-pre-line text-lg leading-loose text-[#2a302d]">{course.description}</p>
+          </Section>
+        )}
+
+        {/* الجدول الزمني والجلسات */}
+        {sessions.length > 0 && (
+          <Section id="sessions" title="الجدول الزمني" tpl={tpl}>
+            <div className="flex flex-col gap-4">
+              {sessions.map((sn) => (
+                <motion.div
+                  key={sn.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true, margin: '-40px' }}
+                  transition={{ duration: 0.4 }}
+                  className="relative rounded-2xl border border-secondary/30 bg-surface p-5 shadow-soft"
+                >
+                  {/* شريط جانبي ذهبي */}
+                  <span className="absolute inset-y-4 right-0 w-1 rounded-full bg-secondary" />
+                  <div className="flex flex-wrap items-center gap-3">
+                    {sn.time_label && (
+                      <span dir="ltr" className="rounded-lg bg-primary/8 px-2.5 py-1 text-sm font-medium text-primary">
+                        {sn.time_label}
+                      </span>
+                    )}
+                    <h3 className="text-lg font-semibold text-primary">{sn.title}</h3>
+                  </div>
+                  <div className="mt-1 flex flex-wrap gap-3 text-sm text-muted">
+                    {sn.presenter && <span>المقدّم: {sn.presenter}</span>}
+                    {sn.session_date && <span>{formatArabicDate(sn.session_date)}</span>}
+                  </div>
+                  {sn.description && (
+                    <p className="mt-3 leading-loose text-[#2a302d]">{sn.description}</p>
+                  )}
+                </motion.div>
+              ))}
+            </div>
           </Section>
         )}
 

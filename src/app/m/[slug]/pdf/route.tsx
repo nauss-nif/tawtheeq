@@ -63,7 +63,9 @@ export async function GET(_req: NextRequest, { params }: { params: { slug: strin
   if (!data) return NextResponse.json({ error: 'غير متاح' }, { status: 404 });
 
   const assets = await buildAssets(data);
-  const buffer = await renderToBuffer(<MagazinePDF course={data.course} assets={assets} />);
+  const buffer = await renderToBuffer(
+    <MagazinePDF course={data.course} sessions={data.sessions} assets={assets} />,
+  );
   const fileName = encodeURIComponent(`${data.course.title}.pdf`);
 
   return new NextResponse(new Uint8Array(buffer), {

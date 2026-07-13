@@ -34,6 +34,8 @@ export const serverEnv = {
   },
   ffmpegPath: process.env.FFMPEG_PATH ?? 'ffmpeg',
   ffprobePath: process.env.FFPROBE_PATH ?? 'ffprobe',
+  // مفتاح الذكاء الاصطناعي لتوليد نصوص الجلسات (Anthropic)
+  anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? '',
 };
 
 /** هل البريد ضمن النطاق المسموح؟ */
