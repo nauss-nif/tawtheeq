@@ -34,15 +34,18 @@ async function toJpegDataUrl(url: string, maxWidth: number): Promise<string | nu
 }
 
 async function buildAssets(data: MagazineData): Promise<PdfAssets> {
-  const [fontRegular, fontSemiBold, logoNauss, logoMoi] = await Promise.all([
+  const [fontRegular, fontSemiBold, logoNauss, logoMoi, logoNaussWhite] = await Promise.all([
     fileDataUrl('fonts/Cairo.ttf', 'font/ttf'),
     fileDataUrl('fonts/Cairo.ttf', 'font/ttf'),
     fileDataUrl('logo-nauss.png', 'image/png'),
     fileDataUrl('logo-moi.png', 'image/png'),
+    fileDataUrl('logo-nauss-white.png', 'image/png'),
   ]);
 
   const coverSrc = data.cover?.processed_url ?? data.landmarkUrl ?? null;
   const coverImage = coverSrc ? await toJpegDataUrl(coverSrc, 1400) : null;
+  // معلم المدينة كخلفية شفافة (إن وُجد)
+  const watermark = data.landmarkUrl ? await toJpegDataUrl(data.landmarkUrl, 900) : null;
 
   // أول 12 صورة للمعرض (لتفادي ملفات ضخمة)
   const gallery = data.images.slice(0, 16);
@@ -55,7 +58,17 @@ async function buildAssets(data: MagazineData): Promise<PdfAssets> {
     )
   ).filter((x): x is { src: string; caption: string | null } => x !== null);
 
-  return { fontRegular, fontSemiBold, logoNauss, logoMoi, coverImage, images };
+  return {
+    fontRegular,
+    fontSemiBold,
+    logoNauss,
+    logoMoi,
+    logoNaussWhite,
+    watermark,
+    showMoi: data.course.show_partnership_logo,
+    coverImage,
+    images,
+  };
 }
 
 export async function GET(_req: NextRequest, { params }: { params: { slug: string } }) {

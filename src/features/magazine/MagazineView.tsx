@@ -65,9 +65,23 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
         )}
       >
         <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          <span className={cn('font-semibold', scrolled ? 'text-white' : 'text-white drop-shadow')}>
-            {course.title}
-          </span>
+          {/* العنوان + الشعارات (شفافة، مع فاصل خفيف) */}
+          <div className="flex items-center gap-3">
+            <span className={cn('max-w-[36vw] truncate font-semibold', scrolled ? 'text-white' : 'text-white drop-shadow')}>
+              {course.title}
+            </span>
+            <div className="hidden items-center gap-2.5 sm:flex">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-nauss-white.png" alt="جامعة نايف" className="h-8 object-contain drop-shadow" />
+              {course.show_partnership_logo && (
+                <>
+                  <span className="h-6 w-px bg-white/30" />
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/logo-moi-white.png" alt="برامج الشراكات الدولية" className="h-8 object-contain drop-shadow" />
+                </>
+              )}
+            </div>
+          </div>
           <div className="hidden items-center gap-1 md:flex">
             {NAV.map((n) => (
               <a
@@ -112,17 +126,6 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
             الصورة: ويكيميديا
           </span>
         )}
-        {/* شريط الشعارين أعلى الغلاف */}
-        <div className="absolute inset-x-0 top-16 z-10 flex justify-center px-4">
-          <div className="flex items-center gap-5 rounded-2xl bg-white/95 px-7 py-3.5 shadow-soft-md">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-moi.png" alt="وزارة الداخلية — برامج الشراكات الدولية" className="h-12 object-contain sm:h-14" />
-            <span className="h-11 w-px bg-muted/25" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-nauss.png" alt="جامعة نايف العربية للعلوم الأمنية" className="h-12 object-contain sm:h-14" />
-          </div>
-        </div>
-
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 text-white">
           <div className={cn('mb-4 h-1.5 w-24 rounded-full', tpl.accent)} />
           <p className="mb-2 text-sm font-medium text-secondary">برامج الشراكات الدولية</p>
@@ -252,16 +255,21 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
 
         {/* خاتمة */}
         <footer className="mt-16 rounded-2xl bg-primary p-10 text-center text-white">
-          <div className="mx-auto mb-5 flex w-fit items-center gap-5 rounded-2xl bg-white px-6 py-4">
+          <div className="mx-auto mb-6 flex w-fit items-center gap-6">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-moi.png" alt="وزارة الداخلية" className="h-12 object-contain" />
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-nauss.png" alt="جامعة نايف" className="h-12 object-contain" />
+            <img src="/logo-nauss-white.png" alt="جامعة نايف" className="h-14 object-contain" />
+            {course.show_partnership_logo && (
+              <>
+                <span className="h-12 w-px bg-white/30" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo-moi-white.png" alt="برامج الشراكات الدولية" className="h-14 object-contain" />
+              </>
+            )}
           </div>
+          <div className={cn('mx-auto mb-3 h-1 w-16 rounded-full', tpl.accent)} />
           <p className="text-lg font-semibold">إدارة عمليات التدريب</p>
-          <p className="mt-1 text-sm text-white/70">جامعة نايف العربية للعلوم الأمنية</p>
-          <p className="mt-0.5 text-xs text-white/50">برامج الشراكات الدولية — وزارة الداخلية</p>
-          <div className={cn('mx-auto mt-3 h-1 w-16 rounded-full', tpl.accent)} />
+          <p className="mt-1 text-sm text-white/80">وكالة الجامعة للتدريب</p>
+          <p className="mt-0.5 text-sm text-white/70">جامعة نايف العربية للعلوم الأمنية</p>
         </footer>
       </main>
 

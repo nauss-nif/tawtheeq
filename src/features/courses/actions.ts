@@ -17,6 +17,7 @@ function parseForm(formData: FormData) {
     // أسماء المدربين حقول ديناميكية متعددة
     trainer_names: formData.getAll('trainer_names').map(String).filter(Boolean),
     template_id: formData.get('template_id') ?? 'classic',
+    show_partnership_logo: formData.get('show_partnership_logo') === 'on',
   });
 }
 
@@ -38,6 +39,7 @@ export async function createCourseAction(formData: FormData) {
       location: d.location || null,
       trainer_names: d.trainer_names,
       template_id: d.template_id,
+      show_partnership_logo: d.show_partnership_logo,
     })
     .select('id')
     .single();
@@ -64,6 +66,7 @@ export async function updateCourseAction(courseId: string, formData: FormData) {
       location: d.location || null,
       trainer_names: d.trainer_names,
       template_id: d.template_id,
+      show_partnership_logo: d.show_partnership_logo,
     })
     .eq('id', courseId); // RLS يضمن الملكية
 

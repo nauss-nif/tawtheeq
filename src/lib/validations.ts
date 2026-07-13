@@ -35,6 +35,7 @@ export const courseSchema = z.object({
   location: z.string().max(200).optional().or(z.literal('')),
   trainer_names: z.array(z.string().min(1)).default([]),
   template_id: z.enum(['classic', 'modern', 'celebratory']).default('classic'),
+  show_partnership_logo: z.boolean().default(true),
 });
 
 export type RegisterInput = z.infer<typeof registerSchema>;

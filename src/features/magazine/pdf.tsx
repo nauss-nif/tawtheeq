@@ -19,6 +19,9 @@ export interface PdfAssets {
   fontSemiBold: string;
   logoNauss: string;
   logoMoi: string;
+  logoNaussWhite: string;
+  watermark: string | null; // معلم المدينة (خلفية شفافة)
+  showMoi: boolean; // إظهار شعار برامج الشراكات
   coverImage: string | null;
   images: { src: string; caption: string | null }[];
 }
@@ -121,9 +124,10 @@ export function MagazinePDF({
     <Document title={course.title} author="جامعة نايف العربية للعلوم الأمنية">
       {/* ===== الغلاف ===== */}
       <Page size="A4" style={s.page}>
-        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', backgroundColor: C.surface, paddingVertical: 18, paddingHorizontal: 34 }}>
-          <Image src={assets.logoMoi} style={{ height: 52, objectFit: 'contain' }} />
-          <Image src={assets.logoNauss} style={{ height: 48, objectFit: 'contain' }} />
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 20, paddingVertical: 18, paddingHorizontal: 34 }}>
+          {assets.showMoi ? <Image src={assets.logoMoi} style={{ height: 48, objectFit: 'contain' }} /> : null}
+          {assets.showMoi ? <View style={{ width: 1, height: 34, backgroundColor: '#00000022' }} /> : null}
+          <Image src={assets.logoNauss} style={{ height: 46, objectFit: 'contain' }} />
         </View>
         <View style={{ flex: 1, position: 'relative' }}>
           {assets.coverImage && (
@@ -143,6 +147,9 @@ export function MagazinePDF({
 
       {/* ===== التعريف + المدربون + الجدول ===== */}
       <Page size="A4" style={s.page}>
+        {assets.watermark ? (
+          <Image src={assets.watermark} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.045 }} />
+        ) : null}
         <Header title={course.title} logo={assets.logoNauss} />
         <View style={s.body}>
           {course.description ? (
@@ -185,6 +192,9 @@ export function MagazinePDF({
       {/* ===== صفحات المعرض: صورتان كبيرتان بعرض الصفحة ===== */}
       {pairs.map((pair, idx) => (
         <Page key={idx} size="A4" style={s.page}>
+          {assets.watermark ? (
+            <Image src={assets.watermark} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.045 }} />
+          ) : null}
           <Header title={course.title} logo={assets.logoNauss} />
           <View style={s.body}>
             {idx === 0 ? (
@@ -209,18 +219,24 @@ export function MagazinePDF({
         </Page>
       ))}
 
-      {/* ===== الغلاف الخلفي ===== */}
+      {/* ===== الغلاف الخلفي: شعار الجامعة في المنتصف + عبارة ثابتة أسفل ===== */}
       <Page size="A4" style={s.page}>
-        <View style={{ flex: 1, backgroundColor: C.primary, alignItems: 'center', justifyContent: 'center', padding: 40 }}>
-          <View style={{ position: 'absolute', top: 20, left: 20, right: 20, bottom: 20, border: `1.5px solid ${C.secondary}55`, borderRadius: 6 }} />
-          <View style={{ flexDirection: 'row', gap: 26, alignItems: 'center', backgroundColor: '#fff', borderRadius: 14, paddingVertical: 20, paddingHorizontal: 28, marginBottom: 26 }}>
-            <Image src={assets.logoMoi} style={{ height: 60, objectFit: 'contain' }} />
-            <Image src={assets.logoNauss} style={{ height: 56, objectFit: 'contain' }} />
+        <View style={{ flex: 1, backgroundColor: C.primary, position: 'relative' }}>
+          {assets.watermark ? (
+            <Image src={assets.watermark} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.14 }} />
+          ) : null}
+          <View style={{ position: 'absolute', top: 22, left: 22, right: 22, bottom: 22, border: `1.5px solid ${C.secondary}55`, borderRadius: 6 }} />
+          {/* الشعار في منتصف الصفحة تمامًا */}
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <Image src={assets.logoNaussWhite} style={{ height: 110, objectFit: 'contain' }} />
           </View>
-          <View style={{ width: 70, height: 5, backgroundColor: C.secondary, borderRadius: 3, marginBottom: 16 }} />
-          <Text style={{ color: '#fff', fontSize: 17, fontWeight: 600 }}>إدارة عمليات التدريب</Text>
-          <Text style={{ color: '#ffffffaa', fontSize: 12, marginTop: 6 }}>جامعة نايف العربية للعلوم الأمنية</Text>
-          <Text style={{ color: '#ffffff88', fontSize: 11, marginTop: 3 }}>برامج الشراكات الدولية - وزارة الداخلية</Text>
+          {/* العبارة الثابتة في الأسفل بمحاذاة المنتصف */}
+          <View style={{ alignItems: 'center', paddingBottom: 56 }}>
+            <View style={{ width: 60, height: 4, backgroundColor: C.secondary, borderRadius: 2, marginBottom: 14 }} />
+            <Text style={{ color: '#fff', fontSize: 15, fontWeight: 600 }}>إدارة عمليات التدريب</Text>
+            <Text style={{ color: '#ffffffcc', fontSize: 12, marginTop: 5 }}>وكالة الجامعة للتدريب</Text>
+            <Text style={{ color: '#ffffffaa', fontSize: 11, marginTop: 3 }}>جامعة نايف العربية للعلوم الأمنية</Text>
+          </View>
         </View>
       </Page>
     </Document>

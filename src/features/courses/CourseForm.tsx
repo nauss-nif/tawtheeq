@@ -107,6 +107,25 @@ export function CourseForm({ course }: { course?: Course }) {
         </div>
       </Card>
 
+      {/* خيار إظهار شعار برامج الشراكات الدولية */}
+      <Card className="flex items-center justify-between gap-4">
+        <div>
+          <CardTitle className="pb-0 after:hidden">شعار برامج الشراكات الدولية</CardTitle>
+          <p className="mt-1 text-sm text-muted">
+            أظهِر شعار برامج الشراكات في المجلة. عطّله إن كانت الدورة تنفّذها الجامعة وحدها.
+          </p>
+        </div>
+        <label className="relative inline-flex cursor-pointer items-center">
+          <input
+            type="checkbox"
+            name="show_partnership_logo"
+            defaultChecked={course?.show_partnership_logo ?? true}
+            className="peer sr-only"
+          />
+          <span className="h-7 w-12 rounded-full bg-muted/30 transition peer-checked:bg-primary after:absolute after:right-1 after:top-1 after:size-5 after:rounded-full after:bg-white after:transition-all peer-checked:after:right-6" />
+        </label>
+      </Card>
+
       <div className="flex gap-3">
         <Button type="submit" loading={pending}>
           {course ? 'حفظ التعديلات' : 'إنشاء الدورة'}

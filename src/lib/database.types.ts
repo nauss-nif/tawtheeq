@@ -33,6 +33,7 @@ export type Course = {
   template_id: TemplateId;
   views_count: number;
   published_at: string | null;
+  show_partnership_logo: boolean;
   created_at: string;
   updated_at: string;
 }
