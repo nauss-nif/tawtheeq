@@ -51,7 +51,7 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen magazine-pattern">
       {/* مؤشر تقدم القراءة */}
       <motion.div className="fixed inset-x-0 top-0 z-50 h-1 origin-right bg-secondary" style={{ scaleX: progress }} />
 
@@ -151,7 +151,7 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
         {/* معرض الصور */}
         {images.length > 0 && (
           <Section id="gallery" title="معرض الصور" tpl={tpl}>
-            <div className="columns-1 gap-4 sm:columns-2 lg:columns-3 [&>*]:mb-4">
+            <div className="columns-1 gap-5 sm:columns-2 lg:columns-3 [&>*]:mb-5">
               {images.map((m, i) => (
                 <motion.figure
                   key={m.id}
@@ -159,12 +159,24 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true, margin: '-40px' }}
                   transition={{ duration: 0.4 }}
-                  className={cn('cursor-zoom-in overflow-hidden bg-surface shadow-soft', tpl.galleryFrame)}
+                  className="group cursor-zoom-in overflow-hidden rounded-2xl border border-secondary/40 bg-surface p-2 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-soft-md"
                   onClick={() => setLightbox(i)}
                 >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={m.thumbnail_url ?? m.processed_url ?? ''} alt={m.caption ?? ''} loading="lazy" className="w-full" />
-                  {m.caption && <figcaption className="p-3 text-sm text-muted">{m.caption}</figcaption>}
+                  <div className="overflow-hidden rounded-xl">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={m.thumbnail_url ?? m.processed_url ?? ''}
+                      alt={m.caption ?? ''}
+                      loading="lazy"
+                      className="w-full transition-transform duration-500 group-hover:scale-105"
+                    />
+                  </div>
+                  {m.caption && (
+                    <figcaption className="px-1 pb-1 pt-3 text-center">
+                      <span className="mx-auto mb-2 block h-0.5 w-8 rounded-full bg-secondary" />
+                      <span className="text-sm font-medium text-primary">{m.caption}</span>
+                    </figcaption>
+                  )}
                 </motion.figure>
               ))}
             </div>

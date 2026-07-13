@@ -3,16 +3,21 @@
 import { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { formatArabicDate } from '@/lib/utils';
+import type { Media } from '@/lib/database.types';
 import type { MagazineData } from './data';
 
 /**
- * وضع Flipbook: تجربة تقليب صفحات احترافية باستخدام page-flip.
- * غلاف بالشعارين وصورة معلم المدينة، وصفحات صور بإطار أنيق مع النصوص أسفلها.
+ * وضع Flipbook: تجربة مجلة حقيقية بصفحات مزخرفة، ترقيم، ترويسة بعنوان الدورة،
+ * شعارات أنيقة، وفواصل ذهبية بين الصور. الشعارات والغلاف بهوية الجامعة.
  */
 export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { course, cover, images, landmarkUrl } = data;
   const coverBg = landmarkUrl ?? cover?.processed_url ?? null;
+
+  // نجمّع الصور صفحتين × صورة لكل صفحة داخلية (فاصل واضح بينها)
+  const pairs: Media[][] = [];
+  for (let i = 0; i < images.length; i += 2) pairs.push(images.slice(i, i + 2));
 
   useEffect(() => {
     let pageFlip: { destroy: () => void } | null = null;
@@ -21,12 +26,12 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
       if (!containerRef.current) return;
       const pf = new PageFlip(containerRef.current, {
         width: 560,
-        height: 760,
+        height: 780,
         size: 'stretch',
         minWidth: 300,
         maxWidth: 900,
-        minHeight: 420,
-        maxHeight: 1250,
+        minHeight: 440,
+        maxHeight: 1280,
         showCover: true,
         mobileScrollSupport: true,
         drawShadow: true,
@@ -38,6 +43,8 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
     })();
     return () => pageFlip?.destroy();
   }, [course.id]);
+
+  let pageNo = 0; // ترقيم الصفحات الداخلية
 
   return (
     <div className="fixed inset-0 z-[70] flex flex-col items-center justify-center bg-primary-dark p-2 sm:p-4">
@@ -55,9 +62,10 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
             // eslint-disable-next-line @next/next/no-img-element
             <img src={coverBg} alt="" className="absolute inset-0 size-full object-cover" />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-primary-dark via-primary/70 to-primary/30" />
+          <div className="absolute inset-0 bg-gradient-to-t from-primary-dark via-primary/75 to-primary/25" />
+          {/* إطار ذهبي زخرفي */}
+          <div className="pointer-events-none absolute inset-4 rounded-xl border border-secondary/50" />
 
-          {/* شعارات على شريط أبيض */}
           <div className="absolute inset-x-0 top-0 flex items-center justify-between gap-2 bg-white/95 px-5 py-3">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo-moi.png" alt="وزارة الداخلية" className="h-9 object-contain" />
@@ -65,10 +73,9 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
             <img src="/logo-nauss.png" alt="جامعة نايف" className="h-9 object-contain" />
           </div>
 
-          {/* العنوان */}
-          <div className="absolute inset-x-0 bottom-0 p-7 text-white">
+          <div className="absolute inset-x-0 bottom-0 p-8 text-white">
             <div className="mb-3 h-1.5 w-16 rounded-full bg-secondary" />
-            <p className="mb-2 text-sm text-secondary">برامج الشراكات الدولية</p>
+            <p className="mb-2 text-sm font-medium tracking-wide text-secondary">برامج الشراكات الدولية</p>
             <h1 className="text-3xl font-semibold leading-snug">{course.title}</h1>
             <div className="mt-3 space-y-0.5 text-sm text-white/85">
               {course.start_date && <p>{formatArabicDate(course.start_date)}</p>}
@@ -78,37 +85,59 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
           </div>
         </div>
 
-        {/* ===== صفحات الصور ===== */}
-        {images.map((m, i) => (
-          <div key={m.id} className="flip-page flex flex-col bg-background">
-            {/* ترويسة رفيعة */}
-            <div className="flex items-center justify-between border-b border-secondary/30 bg-surface px-5 py-2.5">
-              <span className="truncate text-xs font-medium text-primary">{course.title}</span>
-              <span className="text-[10px] text-muted">{i + 1} / {images.length}</span>
-            </div>
-            {/* الصورة في إطار أنيق */}
-            <div className="flex flex-1 items-center justify-center p-5">
-              <div className="max-h-full overflow-hidden rounded-2xl border border-secondary/40 bg-surface p-1.5 shadow-lg">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={m.processed_url ?? m.thumbnail_url ?? ''}
-                  alt={m.caption ?? ''}
-                  className="max-h-[560px] w-full rounded-xl object-contain"
-                />
-              </div>
-            </div>
-            {/* النص أسفل الصورة */}
-            {m.caption && (
-              <div className="px-6 pb-6 text-center">
-                <div className="mx-auto mb-2 h-0.5 w-10 rounded-full bg-secondary" />
-                <p className="text-sm leading-relaxed text-primary">{m.caption}</p>
+        {/* ===== صفحة التعريف ===== */}
+        <MagPage title={course.title} pageNo={++pageNo}>
+          <div className="flex h-full flex-col justify-center px-2">
+            <h2 className="heading-accent text-2xl font-semibold text-primary">عن الدورة</h2>
+            {course.description ? (
+              <p className="mt-4 whitespace-pre-line text-[15px] leading-loose text-[#2a302d]">
+                {course.description}
+              </p>
+            ) : (
+              <p className="mt-4 text-muted">دورة تدريبية ضمن برامج الشراكات الدولية.</p>
+            )}
+            {course.trainer_names.length > 0 && (
+              <div className="mt-8">
+                <h3 className="mb-2 text-lg font-semibold text-primary">المدربون</h3>
+                <div className="gold-divider mb-3 w-24" />
+                <div className="flex flex-wrap gap-2">
+                  {course.trainer_names.map((n) => (
+                    <span key={n} className="rounded-xl bg-primary/8 px-3 py-1.5 text-sm text-primary">{n}</span>
+                  ))}
+                </div>
               </div>
             )}
           </div>
+        </MagPage>
+
+        {/* ===== صفحات الصور (صورتان لكل صفحة مع فاصل ذهبي) ===== */}
+        {pairs.map((pair, idx) => (
+          <MagPage key={idx} title={course.title} pageNo={++pageNo}>
+            <div className="flex h-full flex-col gap-3">
+              {pair.map((m, j) => (
+                <div key={m.id} className="flex min-h-0 flex-1 flex-col">
+                  <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden rounded-2xl border border-secondary/40 bg-white p-1.5 shadow-md">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={m.processed_url ?? m.thumbnail_url ?? ''}
+                      alt={m.caption ?? ''}
+                      className="max-h-full w-full rounded-xl object-cover"
+                    />
+                  </div>
+                  {m.caption && (
+                    <p className="mt-1.5 text-center text-[13px] font-medium text-primary">{m.caption}</p>
+                  )}
+                  {/* فاصل ذهبي بين الصورتين */}
+                  {j === 0 && pair.length > 1 && <div className="gold-divider mx-auto mt-3 w-2/3" />}
+                </div>
+              ))}
+            </div>
+          </MagPage>
         ))}
 
         {/* ===== الختام ===== */}
         <div className="flip-page flex flex-col items-center justify-center bg-primary p-8 text-center text-white" data-density="hard">
+          <div className="pointer-events-none absolute inset-4 rounded-xl border border-secondary/40" />
           <div className="mb-6 flex items-center gap-4 rounded-2xl bg-white px-5 py-4">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo-moi.png" alt="" className="h-12 object-contain" />
@@ -123,6 +152,42 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
       </div>
 
       <p className="mt-3 text-center text-xs text-white/50">اسحب أو انقر حواف الصفحة للتقليب</p>
+    </div>
+  );
+}
+
+/** قالب صفحة مجلة داخلية: خلفية مزخرفة + ترويسة بعنوان الدورة + ترقيم */
+function MagPage({
+  title,
+  pageNo,
+  children,
+}: {
+  title: string;
+  pageNo: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flip-page magazine-pattern relative flex flex-col">
+      {/* شريط جانبي أخضر رفيع (لمسة إصدارات الجامعة) */}
+      <div className="absolute inset-y-0 right-0 w-1.5 bg-primary" />
+      {/* الترويسة: عنوان الدورة + خط ذهبي */}
+      <div className="flex items-center justify-between px-6 pt-5">
+        <span className="truncate text-xs font-semibold text-primary">{title}</span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src="/logo-nauss.png" alt="" className="h-6 object-contain opacity-80" />
+      </div>
+      <div className="mx-6 mt-2 h-px bg-secondary/40" />
+
+      {/* المحتوى */}
+      <div className="min-h-0 flex-1 px-6 py-4">{children}</div>
+
+      {/* التذييل: الجهة + رقم الصفحة */}
+      <div className="mx-6 mb-3 mt-1 flex items-center justify-between border-t border-secondary/25 pt-2">
+        <span className="text-[10px] text-muted">برامج الشراكات الدولية</span>
+        <span className="flex size-6 items-center justify-center rounded-full bg-primary/8 text-[11px] font-semibold text-primary">
+          {pageNo}
+        </span>
+      </div>
     </div>
   );
 }
