@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
@@ -48,7 +47,13 @@ export function Sidebar({ items }: { items: NavItem[] }) {
         )}
       >
         <div className="flex items-center justify-between p-4">
-          {open && <Image src="/logo-nauss.svg" alt="توثيق" width={130} height={40} />}
+          {open && (
+            <div className="flex flex-col gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-nauss.png" alt="جامعة نايف العربية للعلوم الأمنية" className="h-9 w-auto object-contain" />
+              <span className="text-sm font-semibold text-primary">منصة توثيق</span>
+            </div>
+          )}
           <button
             onClick={() => setOpen((v) => !v)}
             className="rounded-xl p-2 text-primary hover:bg-primary/5"

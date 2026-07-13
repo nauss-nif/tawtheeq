@@ -147,9 +147,6 @@ export function MagazinePDF({
 
       {/* ===== التعريف + المدربون + الجدول ===== */}
       <Page size="A4" style={s.page}>
-        {assets.watermark ? (
-          <Image src={assets.watermark} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.045 }} />
-        ) : null}
         <Header title={course.title} logo={assets.logoNauss} />
         <View style={s.body}>
           {course.description ? (
@@ -192,9 +189,6 @@ export function MagazinePDF({
       {/* ===== صفحات المعرض: صورتان كبيرتان بعرض الصفحة ===== */}
       {pairs.map((pair, idx) => (
         <Page key={idx} size="A4" style={s.page}>
-          {assets.watermark ? (
-            <Image src={assets.watermark} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.045 }} />
-          ) : null}
           <Header title={course.title} logo={assets.logoNauss} />
           <View style={s.body}>
             {idx === 0 ? (
