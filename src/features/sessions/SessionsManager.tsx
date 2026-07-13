@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Plus, Trash2, Sparkles, Clock, User, Loader2 } from 'lucide-react';
+import { Plus, Trash2, Sparkles, Clock, User, Loader2, Pencil } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -64,29 +64,63 @@ export function SessionsManager({ courseId, initial }: { courseId: string; initi
 function SessionRow({ session, courseId }: { session: Session; courseId: string }) {
   const [pending, start] = useTransition();
   const [desc, setDesc] = useState(session.description ?? '');
+  const [editing, setEditing] = useState(false);
+  const [f, setF] = useState({
+    title: session.title,
+    presenter: session.presenter ?? '',
+    session_date: session.session_date ?? '',
+    time_label: session.time_label ?? '',
+  });
 
   return (
     <li className="rounded-2xl border border-muted/20 p-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="font-semibold text-primary">{session.title}</p>
-          <div className="mt-1 flex flex-wrap gap-3 text-sm text-muted">
-            {session.presenter && (
-              <span className="inline-flex items-center gap-1"><User className="size-4" /> {session.presenter}</span>
-            )}
-            {session.session_date && <span>{formatArabicDate(session.session_date)}</span>}
-            {session.time_label && (
-              <span className="inline-flex items-center gap-1" dir="ltr"><Clock className="size-4" /> {session.time_label}</span>
-            )}
+        {editing ? (
+          <div className="grid flex-1 gap-2 sm:grid-cols-2">
+            <Input value={f.title} onChange={(e) => setF({ ...f, title: e.target.value })} label="عنوان الجلسة" />
+            <Input value={f.presenter} onChange={(e) => setF({ ...f, presenter: e.target.value })} label="المقدّم" />
+            <Input type="date" value={f.session_date} onChange={(e) => setF({ ...f, session_date: e.target.value })} label="التاريخ" />
+            <Input value={f.time_label} onChange={(e) => setF({ ...f, time_label: e.target.value })} label="الوقت" dir="ltr" />
+            <div className="flex gap-2 sm:col-span-2">
+              <Button size="sm" loading={pending} onClick={() => start(async () => {
+                const res = await updateSessionAction(session.id, courseId, {
+                  title: f.title, presenter: f.presenter || null,
+                  session_date: f.session_date || null, time_label: f.time_label || null,
+                });
+                if (res?.error) toast.error(res.error);
+                else { toast.success('تم الحفظ'); setEditing(false); }
+              })}>حفظ</Button>
+              <Button size="sm" variant="ghost" onClick={() => setEditing(false)}>إلغاء</Button>
+            </div>
           </div>
-        </div>
-        <button
-          onClick={() => start(async () => { await deleteSessionAction(session.id, courseId); toast.success('تم الحذف'); })}
-          className="rounded-xl p-2 text-state-danger hover:bg-state-danger/10"
-          aria-label="حذف"
-        >
-          <Trash2 className="size-4" />
-        </button>
+        ) : (
+          <div>
+            <p className="font-semibold text-primary">{session.title}</p>
+            <div className="mt-1 flex flex-wrap gap-3 text-sm text-muted">
+              {session.presenter && (
+                <span className="inline-flex items-center gap-1"><User className="size-4" /> {session.presenter}</span>
+              )}
+              {session.session_date && <span>{formatArabicDate(session.session_date)}</span>}
+              {session.time_label && (
+                <span className="inline-flex items-center gap-1" dir="ltr"><Clock className="size-4" /> {session.time_label}</span>
+              )}
+            </div>
+          </div>
+        )}
+        {!editing && (
+          <div className="flex gap-1">
+            <button onClick={() => setEditing(true)} className="rounded-xl p-2 text-primary hover:bg-primary/5" aria-label="تعديل">
+              <Pencil className="size-4" />
+            </button>
+            <button
+              onClick={() => start(async () => { await deleteSessionAction(session.id, courseId); toast.success('تم الحذف'); })}
+              className="rounded-xl p-2 text-state-danger hover:bg-state-danger/10"
+              aria-label="حذف"
+            >
+              <Trash2 className="size-4" />
+            </button>
+          </div>
+        )}
       </div>
 
       {/* الوصف + توليد بالذكاء */}
