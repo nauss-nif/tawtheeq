@@ -41,15 +41,15 @@ async function buildAssets(data: MagazineData): Promise<PdfAssets> {
     fileDataUrl('logo-moi.png', 'image/png'),
   ]);
 
-  const coverSrc = data.landmarkUrl ?? data.cover?.processed_url ?? null;
+  const coverSrc = data.cover?.processed_url ?? data.landmarkUrl ?? null;
   const coverImage = coverSrc ? await toJpegDataUrl(coverSrc, 1400) : null;
 
   // أول 12 صورة للمعرض (لتفادي ملفات ضخمة)
-  const gallery = data.images.slice(0, 12);
+  const gallery = data.images.slice(0, 16);
   const images = (
     await Promise.all(
       gallery.map(async (m) => {
-        const src = await toJpegDataUrl(m.processed_url ?? m.thumbnail_url ?? '', 900);
+        const src = await toJpegDataUrl(m.processed_url ?? m.thumbnail_url ?? '', 1200);
         return src ? { src, caption: m.caption } : null;
       }),
     )

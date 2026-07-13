@@ -18,8 +18,9 @@ const NAV = [
 
 export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: string }) {
   const { course, cover, images, videos, sessions, landmarkUrl } = data;
-  // خلفية الغلاف: صورة معلم المدينة تلقائيًا، وإلا صورة غلاف الدورة
-  const heroBg = landmarkUrl ?? cover?.processed_url ?? null;
+  // خلفية الغلاف: صورة الغلاف التي اختارها المنسق أولًا، ثم معلم المدينة احتياطيًا
+  const usingLandmark = !cover?.processed_url && !!landmarkUrl;
+  const heroBg = cover?.processed_url ?? landmarkUrl ?? null;
   const tpl = TEMPLATES[course.template_id];
   const [scrolled, setScrolled] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
@@ -106,19 +107,19 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
         )}
         <div className={cn('absolute inset-0', tpl.heroOverlay)} />
         {/* إسناد المصدر عند استخدام صورة معلم من ويكيبيديا */}
-        {landmarkUrl && (
+        {usingLandmark && (
           <span className="absolute bottom-2 left-3 z-10 text-[10px] text-white/60">
             الصورة: ويكيميديا
           </span>
         )}
         {/* شريط الشعارين أعلى الغلاف */}
-        <div className="absolute inset-x-0 top-14 z-10 flex justify-center px-4">
-          <div className="flex items-center gap-4 rounded-2xl bg-white/95 px-5 py-2.5 shadow-soft">
+        <div className="absolute inset-x-0 top-16 z-10 flex justify-center px-4">
+          <div className="flex items-center gap-5 rounded-2xl bg-white/95 px-7 py-3.5 shadow-soft-md">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-moi.png" alt="وزارة الداخلية — برامج الشراكات الدولية" className="h-9 object-contain sm:h-10" />
-            <span className="h-8 w-px bg-muted/30" />
+            <img src="/logo-moi.png" alt="وزارة الداخلية — برامج الشراكات الدولية" className="h-12 object-contain sm:h-14" />
+            <span className="h-11 w-px bg-muted/25" />
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-nauss.png" alt="جامعة نايف العربية للعلوم الأمنية" className="h-9 object-contain sm:h-10" />
+            <img src="/logo-nauss.png" alt="جامعة نايف العربية للعلوم الأمنية" className="h-12 object-contain sm:h-14" />
           </div>
         </div>
 
