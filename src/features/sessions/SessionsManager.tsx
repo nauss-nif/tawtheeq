@@ -8,22 +8,62 @@ import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { formatArabicDate } from '@/lib/utils';
 import type { Session } from '@/lib/database.types';
+import { Clipboard } from 'lucide-react';
 import {
   addSessionAction,
   updateSessionAction,
   deleteSessionAction,
   generateSessionDescriptionAction,
+  importSessionsAction,
 } from './actions';
 
 export function SessionsManager({ courseId, initial }: { courseId: string; initial: Session[] }) {
   const [pending, start] = useTransition();
+  const [pasteOpen, setPasteOpen] = useState(false);
+  const [pasteText, setPasteText] = useState('');
 
   return (
     <Card className="flex flex-col gap-5">
       <CardTitle>الجدول الزمني والجلسات</CardTitle>
       <p className="text-sm text-muted">
-        أضف عناوين الجلسات ومقدّميها؛ ويمكنك توليد وصف احترافي لكل جلسة تلقائيًا.
+        أضف الجلسات يدويًا، أو الصق الجدول المنسوخ من نظام التدريب ليُستخرج تلقائيًا.
       </p>
+
+      {/* لصق ذكي */}
+      <div className="rounded-2xl border border-secondary/30 bg-background p-4">
+        <button
+          onClick={() => setPasteOpen((v) => !v)}
+          className="flex items-center gap-2 text-sm font-semibold text-primary"
+        >
+          <Clipboard className="size-4 text-secondary" /> لصق ذكي (استخراج الجلسات من نص منسوخ)
+        </button>
+        {pasteOpen && (
+          <div className="mt-3 flex flex-col gap-2">
+            <textarea
+              value={pasteText}
+              onChange={(e) => setPasteText(e.target.value)}
+              placeholder="الصق هنا الجدول الزمني كما نسختَه من نظام التدريب…"
+              className="min-h-32 w-full rounded-2xl border border-muted/30 bg-surface px-4 py-3 text-sm"
+            />
+            <p className="text-xs text-muted">
+              سيتم تجاهل «المراجعة وتطبيقات عملية» وسطور الملفات والروابط تلقائيًا.
+            </p>
+            <Button
+              size="sm"
+              loading={pending}
+              onClick={() =>
+                start(async () => {
+                  const res = await importSessionsAction(courseId, pasteText);
+                  if (res?.error) toast.error(res.error);
+                  else { toast.success(res?.success ?? 'تمت الإضافة'); setPasteText(''); setPasteOpen(false); }
+                })
+              }
+            >
+              <Clipboard className="size-4" /> استخراج الجلسات
+            </Button>
+          </div>
+        )}
+      </div>
 
       {/* نموذج إضافة */}
       <form

@@ -64,44 +64,47 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
           scrolled ? 'bg-primary/95 shadow-soft backdrop-blur' : 'bg-transparent',
         )}
       >
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          {/* العنوان + الشعارات (شفافة، مع فاصل خفيف) */}
-          <div className="flex items-center gap-3">
-            <span className={cn('max-w-[36vw] truncate font-semibold', scrolled ? 'text-white' : 'text-white drop-shadow')}>
-              {course.title}
-            </span>
-            <div className="hidden items-center gap-2.5 sm:flex">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+          {/* يمينًا: الشعارات ثم العنوان ثم روابط الأقسام */}
+          <div className="flex min-w-0 items-center gap-3">
+            {/* الشعارات (جامعة نايف ثم برامج الشراكات) */}
+            <div className="flex shrink-0 items-center gap-2.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-nauss-white.png" alt="جامعة نايف" className="h-8 object-contain drop-shadow" />
+              <img src="/logo-nauss-white.png" alt="جامعة نايف العربية للعلوم الأمنية" className="h-8 object-contain drop-shadow sm:h-9" />
               {course.show_partnership_logo && (
                 <>
-                  <span className="h-6 w-px bg-white/30" />
+                  <span className="h-7 w-px bg-white/30" />
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/logo-moi-white.png" alt="برامج الشراكات الدولية" className="h-8 object-contain drop-shadow" />
+                  <img src="/logo-moi-white.png" alt="برامج الشراكات الدولية" className="h-8 object-contain drop-shadow sm:h-9" />
                 </>
               )}
             </div>
+            <span className="hidden h-8 w-px bg-white/25 lg:block" />
+            <span className={cn('hidden max-w-[22vw] truncate font-semibold text-white drop-shadow lg:block')}>
+              {course.title}
+            </span>
+            <div className="mr-2 hidden items-center gap-1 md:flex">
+              {NAV.map((n) => (
+                <a
+                  key={n.id}
+                  href={`#${n.id}`}
+                  className={cn(
+                    'rounded-xl px-2.5 py-1.5 text-sm text-white/90 transition-colors',
+                    scrolled ? 'hover:bg-white/10' : 'hover:bg-black/20',
+                  )}
+                >
+                  {n.label}
+                </a>
+              ))}
+            </div>
           </div>
-          <div className="hidden items-center gap-1 md:flex">
-            {NAV.map((n) => (
-              <a
-                key={n.id}
-                href={`#${n.id}`}
-                className={cn(
-                  'rounded-xl px-3 py-1.5 text-sm transition-colors',
-                  scrolled ? 'text-white/90 hover:bg-white/10' : 'text-white/90 hover:bg-black/20',
-                )}
-              >
-                {n.label}
-              </a>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
+          {/* يسارًا: الأزرار */}
+          <div className="flex shrink-0 items-center gap-2">
             <button
               onClick={() => setFlip(true)}
               className="inline-flex items-center gap-1.5 rounded-xl bg-secondary px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
             >
-              <BookOpen className="size-4" /> <span className="hidden sm:inline">تقليب</span>
+              <BookOpen className="size-4" /> <span className="hidden sm:inline">المجلة الإلكترونية</span>
             </button>
             <a
               href={`/m/${course.magazine_slug}/pdf`}

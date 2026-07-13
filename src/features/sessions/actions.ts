@@ -4,6 +4,34 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/session';
 import { generateSessionText, isAiConfigured } from '@/lib/ai';
+import { parseSchedule } from './parse';
+
+/** لصق ذكي: يحلّل النص المنسوخ ويضيف الجلسات دفعة واحدة */
+export async function importSessionsAction(courseId: string, text: string) {
+  await requireProfile();
+  const parsed = parseSchedule(text);
+  if (parsed.length === 0) return { error: 'لم يتم التعرّف على جلسات في النص' };
+
+  const supabase = createClient();
+  const { count } = await supabase
+    .from('sessions')
+    .select('id', { count: 'exact', head: true })
+    .eq('course_id', courseId);
+  const base = count ?? 0;
+
+  const rows = parsed.map((p, i) => ({
+    course_id: courseId,
+    title: p.title,
+    time_label: p.time_label,
+    session_date: p.session_date,
+    sort_order: base + i,
+  }));
+
+  const { error } = await supabase.from('sessions').insert(rows);
+  if (error) return { error: 'تعذّر إضافة الجلسات' };
+  revalidatePath(`/dashboard/courses/${courseId}`);
+  return { success: `تمت إضافة ${parsed.length} جلسة`, count: parsed.length };
+}
 
 export async function addSessionAction(courseId: string, formData: FormData) {
   await requireProfile();
