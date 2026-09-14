@@ -10,7 +10,7 @@ import { Flipbook } from './Flipbook';
 
 const NAV = [
   { id: 'intro', label: 'تعريف' },
-  { id: 'sessions', label: 'الجلسات' },
+  { id: 'sessions', label: 'المحاور' },
   { id: 'gallery', label: 'المعرض' },
   { id: 'videos', label: 'الفيديو' },
   { id: 'trainers', label: 'المدربون' },
@@ -18,6 +18,14 @@ const NAV = [
 
 export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: string }) {
   const { course, cover, images, videos, sessions, landmarkUrl } = data;
+  // نجمع الصور حسب الجلسة لعرضها بجانب محاور الدورة
+  const bySession = new Map<string, typeof images>();
+  for (const sn of sessions) bySession.set(sn.id, []);
+  for (const m of images) {
+    if (m.session_id && bySession.has(m.session_id)) bySession.get(m.session_id)!.push(m);
+  }
+  const unassignedImages = images.filter((m) => !(m.session_id && bySession.has(m.session_id)));
+  const toArabic = (n: number) => String(n).replace(/\d/g, (d) => '٠١٢٣٤٥٦٧٨٩'[+d]);
   // خلفية الغلاف: صورة الغلاف التي اختارها المنسق أولًا، ثم معلم المدينة احتياطيًا
   const usingLandmark = !cover?.processed_url && !!landmarkUrl;
   const heroBg = cover?.processed_url ?? landmarkUrl ?? null;
@@ -131,7 +139,7 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
         )}
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 text-white">
           <div className={cn('mb-4 h-1.5 w-24 rounded-full', tpl.accent)} />
-          <p className="mb-2 text-sm font-medium text-secondary">برامج الشراكات الدولية</p>
+          <p className="mb-2 text-sm font-medium text-secondary">الدورة التدريبية</p>
           <h1 className={tpl.heroTitle}>{course.title}</h1>
           <div className="mt-4 flex flex-wrap gap-4 text-white/90">
             {course.start_date && (
@@ -149,6 +157,15 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-16">
+        {/* نص الترحيب (اختياري) */}
+        {course.welcome_text && (
+          <div className="mx-auto mb-14 max-w-3xl text-center">
+            <div className="mx-auto mb-5 h-1 w-16 rounded-full bg-secondary" />
+            <p className="text-xl font-medium leading-loose text-primary">{course.welcome_text}</p>
+            <div className="mx-auto mt-5 h-1 w-16 rounded-full bg-secondary" />
+          </div>
+        )}
+
         {/* قسم تعريفي */}
         {course.description && (
           <Section id="intro" title="عن الدورة" tpl={tpl}>
@@ -156,47 +173,67 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
           </Section>
         )}
 
-        {/* الجدول الزمني والجلسات */}
+        {/* محاور الدورة: كل المحاور تُذكر بعنوانها ووصفها، والصور إن وُجدت */}
         {sessions.length > 0 && (
-          <Section id="sessions" title="الجدول الزمني" tpl={tpl}>
-            <div className="flex flex-col gap-4">
-              {sessions.map((sn) => (
-                <motion.div
-                  key={sn.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: '-40px' }}
-                  transition={{ duration: 0.4 }}
-                  className="relative rounded-2xl border border-secondary/30 bg-surface p-5 shadow-soft"
-                >
-                  {/* شريط جانبي ذهبي */}
-                  <span className="absolute inset-y-4 right-0 w-1 rounded-full bg-secondary" />
-                  <div className="flex flex-wrap items-center gap-3">
-                    {sn.time_label && (
-                      <span dir="ltr" className="rounded-lg bg-primary/8 px-2.5 py-1 text-sm font-medium text-primary">
-                        {sn.time_label}
+          <Section id="sessions" title="محاور الدورة" tpl={tpl}>
+            <div className="flex flex-col gap-8">
+              {sessions.map((sn, i) => {
+                const sImgs = bySession.get(sn.id) ?? [];
+                return (
+                  <motion.article
+                    key={sn.id}
+                    initial={{ opacity: 0, y: 24 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: '-40px' }}
+                    transition={{ duration: 0.45 }}
+                    className="grid gap-6 rounded-3xl border border-secondary/30 bg-surface p-6 shadow-soft md:grid-cols-2"
+                  >
+                    {/* النص */}
+                    <div className={sImgs.length === 0 ? 'md:col-span-2' : ''}>
+                      <span className="inline-block rounded-full bg-secondary/15 px-3 py-1 text-xs font-bold text-secondary">
+                        الجلسة {toArabic(i + 1)}
                       </span>
+                      <h3 className="mt-3 text-xl font-semibold text-primary">{sn.title}</h3>
+                      <div className="mt-1 mb-3 h-1 w-12 rounded-full bg-secondary" />
+                      <div className="flex flex-wrap gap-3 text-sm text-muted">
+                        {sn.presenter && <span>المقدّم: {sn.presenter}</span>}
+                        {sn.time_label && <span dir="ltr">{sn.time_label}</span>}
+                        {sn.session_date && <span>{formatArabicDate(sn.session_date)}</span>}
+                      </div>
+                      {sn.description ? (
+                        <p className="mt-3 leading-loose text-[#2a302d]">{sn.description}</p>
+                      ) : (
+                        <p className="mt-3 leading-loose text-muted">جلسة ضمن محاور الدورة التدريبية.</p>
+                      )}
+                    </div>
+
+                    {/* كل صور المحور (قابلة للتكبير) */}
+                    {sImgs.length > 0 && (
+                      <div className={`grid content-start gap-3 ${sImgs.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                        {sImgs.map((m) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            key={m.id}
+                            src={m.processed_url ?? m.thumbnail_url ?? ''}
+                            alt={m.caption ?? sn.title}
+                            onClick={() => setLightbox(images.findIndex((x) => x.id === m.id))}
+                            className="h-auto w-full cursor-zoom-in rounded-2xl border border-secondary/30 object-cover transition-transform duration-300 hover:-translate-y-0.5"
+                          />
+                        ))}
+                      </div>
                     )}
-                    <h3 className="text-lg font-semibold text-primary">{sn.title}</h3>
-                  </div>
-                  <div className="mt-1 flex flex-wrap gap-3 text-sm text-muted">
-                    {sn.presenter && <span>المقدّم: {sn.presenter}</span>}
-                    {sn.session_date && <span>{formatArabicDate(sn.session_date)}</span>}
-                  </div>
-                  {sn.description && (
-                    <p className="mt-3 leading-loose text-[#2a302d]">{sn.description}</p>
-                  )}
-                </motion.div>
-              ))}
+                  </motion.article>
+                );
+              })}
             </div>
           </Section>
         )}
 
-        {/* معرض الصور */}
-        {images.length > 0 && (
-          <Section id="gallery" title="معرض الصور" tpl={tpl}>
+        {/* صور من الدورة (غير المرتبطة بمحور) — بلا تكرار لصور المحاور */}
+        {unassignedImages.length > 0 && (
+          <Section id="gallery" title="صور من الدورة" tpl={tpl}>
             <div className="columns-1 gap-5 sm:columns-2 lg:columns-3 [&>*]:mb-5">
-              {images.map((m, i) => (
+              {unassignedImages.map((m) => (
                 <motion.figure
                   key={m.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -204,7 +241,7 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
                   viewport={{ once: true, margin: '-40px' }}
                   transition={{ duration: 0.4 }}
                   className="group cursor-zoom-in overflow-hidden rounded-2xl border border-secondary/40 bg-surface p-2 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-soft-md"
-                  onClick={() => setLightbox(i)}
+                  onClick={() => setLightbox(images.findIndex((x) => x.id === m.id))}
                 >
                   <div className="overflow-hidden rounded-xl">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -252,6 +289,34 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
                   <Users className="size-5 text-secondary" /> <span className="font-medium text-primary">{name}</span>
                 </span>
               ))}
+            </div>
+          </Section>
+        )}
+
+        {/* مُعِدّ المجلة (المنسق المسؤول) */}
+        {data.coordinator && (
+          <Section id="editor" title="إعداد المجلة" tpl={tpl}>
+            <div className="flex items-center gap-5 rounded-3xl border border-secondary/30 bg-surface p-6 shadow-soft">
+              {data.coordinator.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={data.coordinator.avatar_url}
+                  alt={data.coordinator.full_name}
+                  className="size-24 shrink-0 rounded-full border-2 border-secondary/50 object-cover"
+                />
+              ) : (
+                <span className="flex size-24 shrink-0 items-center justify-center rounded-full border-2 border-secondary/40 bg-background">
+                  <Users className="size-10 text-secondary" />
+                </span>
+              )}
+              <div>
+                <p className="text-xl font-semibold text-primary">{data.coordinator.full_name}</p>
+                <div className="mt-1 mb-2 h-1 w-12 rounded-full bg-secondary" />
+                <p className="text-muted">
+                  {data.coordinator.job_title || 'منسّق الدورة'}
+                </p>
+                <p className="mt-1 text-sm text-muted">إدارة عمليات التدريب · جامعة نايف العربية للعلوم الأمنية</p>
+              </div>
             </div>
           </Section>
         )}

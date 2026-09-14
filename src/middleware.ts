@@ -39,7 +39,10 @@ export async function middleware(request: NextRequest) {
     const url = request.nextUrl.clone();
     url.pathname = '/auth/login';
     url.searchParams.set('next', path);
-    return NextResponse.redirect(url);
+    const redirectResponse = NextResponse.redirect(url);
+    // ننقل كوكيز الجلسة المحدّثة إلى استجابة التحويل، وإلا ضاع التوكن الجديد
+    response.cookies.getAll().forEach((c) => redirectResponse.cookies.set(c));
+    return redirectResponse;
   }
 
   return response;

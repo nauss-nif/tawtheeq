@@ -1,7 +1,8 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { X, ChevronRight, ChevronLeft } from 'lucide-react';
+import type { PageFlip as PageFlipInstance } from 'page-flip';
 import { formatArabicDate } from '@/lib/utils';
 import type { MagazineData } from './data';
 
@@ -12,42 +13,131 @@ import type { MagazineData } from './data';
  */
 export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
-  const { course, cover, images, landmarkUrl } = data;
+  const { course, cover, images, sessions, coordinator, landmarkUrl } = data;
   const coverBg = cover?.processed_url ?? landmarkUrl ?? null;
   const showMoi = course.show_partnership_logo;
-  const watermark = landmarkUrl; // خلفية شفافة خفيفة لكل الصفحات
+
+  // نجمع الصور حسب الجلسة المرتبطة بها
+  const bySession = new Map<string, typeof images>();
+  for (const s of sessions) bySession.set(s.id, []);
+  const unassigned: typeof images = [];
+  for (const m of images) {
+    if (m.session_id && bySession.has(m.session_id)) bySession.get(m.session_id)!.push(m);
+    else unassigned.push(m);
+  }
+
+  // مقاس التصميم الثابت للصفحة الواحدة. على الجوال نعرض صفحة واحدة، وعلى الشاشات الكبيرة صفحتين،
+  // ثم نُصغّرها بتناسب واحد (transform) لتملأ الشاشة دون الحاجة لإمالة الجهاز.
+  // مقاس الصفحة: أفقي على الشاشات الكبيرة، وعمودي على الجوال ليملأ الشاشة
+  const LANDSCAPE = { w: 800, h: 560 };
+  const PORTRAIT = { w: 560, h: 800 };
+  const [singlePage, setSinglePage] = useState(false);
+  const [scale, setScale] = useState(0.5);
+  const PAGE_W = singlePage ? PORTRAIT.w : LANDSCAPE.w;
+  const PAGE_H = singlePage ? PORTRAIT.h : LANDSCAPE.h;
 
   useEffect(() => {
-    let pageFlip: { destroy: () => void } | null = null;
+    const fit = () => {
+      const single = window.innerWidth < 768; // الجوال: صفحة واحدة عمودية
+      const { w, h } = single ? PORTRAIT : LANDSCAPE;
+      const pages = single ? 1 : 2;
+      const availW = window.innerWidth - 12;
+      const availH = window.innerHeight - 128; // مساحة أزرار التقليب والسطر الإرشادي
+      setSinglePage(single);
+      setScale(Math.max(0.2, Math.min(availW / (w * pages), availH / h, 1.25)));
+    };
+    fit();
+    window.addEventListener('resize', fit);
+    window.addEventListener('orientationchange', fit);
+    return () => {
+      window.removeEventListener('resize', fit);
+      window.removeEventListener('orientationchange', fit);
+    };
+  }, []);
+
+  const [flip, setFlip] = useState<PageFlipInstance | null>(null);
+  const [pageIndex, setPageIndex] = useState(0);
+  const [pageCount, setPageCount] = useState(0);
+  // مفتاح التركيب: تغيّره يُعيد بناء حاوية نظيفة — page-flip ينقل عناصر DOM ولا يقبل إعادة تهيئة فوق حاوية مستعملة
+  const mountKey = `${course.id}-${singlePage ? 'portrait' : 'landscape'}`;
+
+  useEffect(() => {
+    let pf: PageFlipInstance | null = null;
+    let cancelled = false;
+
     (async () => {
       const { PageFlip } = await import('page-flip');
-      if (!containerRef.current) return;
-      const pf = new PageFlip(containerRef.current, {
-        width: 800,
-        height: 560,
-        size: 'stretch',
-        minWidth: 320,
-        maxWidth: 1000,
-        minHeight: 300,
-        maxHeight: 720,
+      const el = containerRef.current;
+      // الاستيراد غير متزامن: قد يُفكَّك المكوّن قبل الوصول هنا (StrictMode يركّب مرتين)
+      if (cancelled || !el) return;
+      const pages = Array.from(el.querySelectorAll<HTMLElement>('.flip-page'));
+      if (pages.length === 0) return;
+
+      const instance = new PageFlip(el, {
+        width: PAGE_W,
+        height: PAGE_H,
+        size: 'fixed',
         showCover: true,
+        usePortrait: singlePage, // صفحة واحدة على الجوال
         mobileScrollSupport: true,
+        useMouseEvents: true,
+        swipeDistance: 20, // لمسة أقصر تكفي للتقليب على الجوال
         drawShadow: true,
         maxShadowOpacity: 0.4,
       });
-      const pages = Array.from(containerRef.current.querySelectorAll<HTMLElement>('.flip-page'));
-      pf.loadFromHTML(pages);
-      pageFlip = pf;
+      instance.loadFromHTML(pages);
+
+      if (cancelled) {
+        try { instance.destroy(); } catch { /* فُكِّك قبل اكتمال التهيئة */ }
+        return;
+      }
+
+      instance.on('flip', (e) => setPageIndex(Number(e.data)));
+      pf = instance;
+      setFlip(instance);
+      setPageCount(instance.getPageCount());
+      setPageIndex(instance.getCurrentPageIndex());
     })();
-    return () => pageFlip?.destroy();
-  }, [course.id]);
+
+    return () => {
+      cancelled = true;
+      setFlip(null);
+      try { pf?.destroy(); } catch { /* استبدلت React العناصر قبل التدمير */ }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mountKey]);
+
+  // تقليب بالأسهم وإغلاق بـ Escape
+  useEffect(() => {
+    if (!flip) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') flip.flipPrev();
+      else if (e.key === 'ArrowLeft') flip.flipNext();
+      else if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [flip, onClose]);
 
   const interior: React.ReactNode[] = [];
   let pageNo = 0;
 
+  // صفحة الترحيب (اختيارية)
+  if (course.welcome_text) {
+    interior.push(
+      <MagPage key="welcome" heading={course.title} courseTitle={course.title} pageNo={++pageNo} showMoi={showMoi}>
+        <div className="flex h-full flex-col items-center justify-center px-6 text-center">
+          <div className="mb-6 h-1 w-16 rounded-full bg-secondary" />
+          <p className="max-w-[85%] text-[15px] font-medium leading-loose text-primary">{course.welcome_text}</p>
+          <div className="mt-6 h-1 w-16 rounded-full bg-secondary" />
+        </div>
+      </MagPage>,
+    );
+  }
+
   // صفحة التعريف
   interior.push(
-    <MagPage key="intro" title={course.title} pageNo={++pageNo} watermark={watermark} showMoi={showMoi}>
+    <MagPage key="intro" heading={course.title} courseTitle={course.title} pageNo={++pageNo} showMoi={showMoi}>
       <div className="flex h-full flex-col justify-center">
         <h2 className="text-xl font-semibold text-primary">عن الدورة</h2>
         <div className="mt-2 mb-3 h-1 w-14 rounded-full bg-secondary" />
@@ -68,35 +158,80 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
             </div>
           </div>
         )}
+        {coordinator && (
+          <div className="mt-5 flex items-center gap-3 rounded-xl border border-secondary/30 bg-white/60 p-3">
+            {coordinator.avatar_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={coordinator.avatar_url} alt={coordinator.full_name} className="size-12 shrink-0 rounded-full border border-secondary/50 object-cover" />
+            ) : null}
+            <div>
+              <p className="text-[11px] text-muted">إعداد المجلة</p>
+              <p className="text-[13.5px] font-semibold text-primary">{coordinator.full_name}</p>
+              <p className="text-[11px] text-muted">{coordinator.job_title || 'منسّق الدورة'}</p>
+            </div>
+          </div>
+        )}
       </div>
     </MagPage>,
   );
 
-  // صورة واحدة أفقية كبيرة لكل صفحة
-  images.forEach((m) => {
+  // كل المحاور تُعرض بترقيم تسلسلي، ولو لم تُسند لها صور
+  const shownSessions = sessions;
+  shownSessions.forEach((s, i) => {
+    const sImgs = bySession.get(s.id) ?? [];
+    const main = sImgs[0];
     interior.push(
-      <MagPage key={m.id} title={course.title} pageNo={++pageNo} watermark={watermark} showMoi={showMoi}>
-        <div className="flex h-full flex-col">
-          <div className="flex min-h-0 flex-1 items-center justify-center">
-            <div className="flex max-h-full max-w-full items-center justify-center overflow-hidden rounded-xl border border-secondary/40 bg-white p-1.5 shadow-md">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={m.processed_url ?? m.thumbnail_url ?? ''}
-                alt={m.caption ?? ''}
-                className="max-h-[330px] w-auto max-w-full rounded-lg object-contain"
-              />
-            </div>
+      <MagPage key={`s-${s.id}`} heading={s.title} courseTitle={course.title} pageNo={++pageNo} showMoi={showMoi}>
+        <div className={`flex h-full gap-5 ${singlePage ? 'flex-col justify-center' : ''}`}>
+          {/* عمود النص (يمين في RTL؛ أعلى الصفحة على الجوال) */}
+          <div className={`flex flex-col justify-center ${main && !singlePage ? 'w-[44%]' : 'w-full'}`}>
+            <span className="mb-2 w-fit rounded-full bg-secondary/15 px-3 py-1 text-[11px] font-bold text-secondary">
+              الجلسة {toArabic(i + 1)}
+            </span>
+            <h2 className="text-[19px] font-semibold leading-snug text-primary">{s.title}</h2>
+            <div className="mt-2 mb-3 h-1 w-12 rounded-full bg-secondary" />
+            {(s.presenter || s.time_label) && (
+              <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted">
+                {s.presenter && <span>المقدّم: {s.presenter}</span>}
+                {s.time_label && <span dir="ltr">{s.time_label}</span>}
+              </div>
+            )}
+            {s.description ? (
+              <p className="whitespace-pre-line text-[13px] leading-relaxed text-[#2a302d]">{s.description}</p>
+            ) : (
+              <p className="text-[13px] leading-relaxed text-muted">جلسة ضمن برنامج الدورة التدريبية.</p>
+            )}
           </div>
-          {m.caption && (
-            <div className="mt-2 shrink-0 text-center">
-              <div className="mx-auto mb-1 h-0.5 w-10 rounded-full bg-secondary" />
-              <p className="text-[13.5px] font-medium text-primary">{m.caption}</p>
+
+          {/* عمود الصورة الرئيسية (يسار) */}
+          {main && (
+            <div className="flex flex-1 items-center justify-center">
+              <div className="flex max-h-full w-fit items-center overflow-hidden rounded-xl border border-secondary/40 bg-white p-1.5 shadow-md">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={main.processed_url ?? main.thumbnail_url ?? ''}
+                  alt={main.caption ?? s.title}
+                  className="mx-auto max-h-full w-auto max-w-full rounded-lg object-contain"
+                />
+              </div>
             </div>
           )}
         </div>
       </MagPage>,
     );
+
+    // بقية صور المحور: صفحة كبيرة لكل صورة، عنوانها اسم المحور فقط
+    sImgs.slice(1).forEach((m) => {
+      interior.push(imagePage(m, s.title, course.title, ++pageNo, showMoi, s.title));
+    });
   });
+
+  // الصور غير المرتبطة بمحور: صفحة كبيرة لكل صورة تحت عنوان عام
+  if (unassigned.length > 0) {
+    unassigned.forEach((m, idx) => {
+      interior.push(imagePage(m, 'صور من الدورة', course.title, ++pageNo, showMoi, idx === 0 ? 'صور من الدورة' : undefined));
+    });
+  }
 
   // ضبط زوجي حتى ينغلق الغلاف الخلفي
   if ((interior.length + 2) % 2 !== 0) {
@@ -116,7 +251,19 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
         <X className="size-5" /> إغلاق
       </button>
 
-      <div ref={containerRef} className="flipbook mx-auto">
+      {/* غلاف يحجز المساحة المُصغّرة، والداخل بمقاس التصميم مع تصغير بتناسب واحد */}
+      <div style={{ width: PAGE_W * (singlePage ? 1 : 2) * scale, height: PAGE_H * scale }} className="relative">
+      {/* غلاف التصغير: نعزل تحويل React عن الحاوية التي يتحكّم بها page-flip */}
+      <div
+        className="absolute left-0 top-0"
+        style={{ width: PAGE_W * (singlePage ? 1 : 2), height: PAGE_H, transform: `scale(${scale})`, transformOrigin: 'top left' }}
+      >
+      <div
+        key={mountKey}
+        ref={containerRef}
+        className="flipbook"
+        style={{ width: PAGE_W * (singlePage ? 1 : 2), height: PAGE_H }}
+      >
         {/* ===== الغلاف الأمامي ===== */}
         <div className="flip-page relative overflow-hidden bg-primary" data-density="hard">
           {coverBg && (
@@ -141,7 +288,7 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
 
           <div className="absolute inset-x-0 bottom-0 p-8 text-white">
             <div className="mb-2.5 h-1.5 w-16 rounded-full bg-secondary" />
-            <p className="mb-2 text-[13px] font-medium tracking-wide text-secondary">برامج الشراكات الدولية</p>
+            <p className="mb-2 text-[13px] font-medium tracking-wide text-secondary">الدورة التدريبية</p>
             <h1 className="max-w-[70%] text-[26px] font-semibold leading-snug drop-shadow-sm">{course.title}</h1>
             <div className="mt-3 flex gap-4 text-sm text-white/90">
               {course.start_date && <span>{formatArabicDate(course.start_date)}</span>}
@@ -156,20 +303,16 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
         {/* ===== الصفحات الداخلية ===== */}
         {interior}
 
-        {/* ===== الغلاف الخلفي ===== */}
-        <div className="flip-page relative flex flex-col items-center justify-center overflow-hidden bg-primary text-center text-white" data-density="hard">
-          {watermark && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={watermark} alt="" className="absolute inset-0 size-full object-cover opacity-15" />
-          )}
+        {/* ===== الغلاف الخلفي: الشعار في المنتصف تمامًا + عبارة ثابتة أسفل (مواضع مثبّتة) ===== */}
+        <div className="flip-page relative overflow-hidden bg-primary text-center text-white" data-density="hard">
           <div className="pointer-events-none absolute inset-4 rounded-lg border border-secondary/40" />
           {/* شعار الجامعة في منتصف الصفحة تمامًا */}
-          <div className="relative flex flex-1 items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-nauss-white.png" alt="جامعة نايف" className="h-24 object-contain" />
+            <img src="/logo-nauss-white.png" alt="جامعة نايف العربية للعلوم الأمنية" className="h-28 object-contain" />
           </div>
-          {/* عبارة ثابتة في الأسفل بمحاذاة المنتصف */}
-          <div className="relative mb-8 space-y-1">
+          {/* عبارة ثابتة أسفل الصفحة */}
+          <div className="absolute inset-x-0 bottom-10 space-y-1">
             <div className="mx-auto mb-3 h-1 w-14 rounded-full bg-secondary" />
             <p className="text-base font-semibold">إدارة عمليات التدريب</p>
             <p className="text-sm text-white/80">وكالة الجامعة للتدريب</p>
@@ -177,60 +320,131 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
           </div>
         </div>
       </div>
+      </div>
+      </div>
 
-      <p className="mt-3 text-center text-xs text-white/50">اسحب أو انقر حواف الصفحة للتقليب</p>
+      <div className="mt-3 flex items-center gap-4 text-white/85">
+        <button
+          type="button"
+          onClick={() => flip?.flipPrev()}
+          disabled={!flip || pageIndex === 0}
+          aria-label="الصفحة السابقة"
+          className="inline-flex size-10 items-center justify-center rounded-full bg-white/15 transition hover:bg-white/25 disabled:opacity-30"
+        >
+          <ChevronRight className="size-5" />
+        </button>
+        <span className="min-w-24 text-center text-xs tabular-nums text-white/70">
+          {pageCount > 0 ? `${pageIndex + 1} / ${pageCount}` : '...'}
+        </span>
+        <button
+          type="button"
+          onClick={() => flip?.flipNext()}
+          disabled={!flip || (pageCount > 0 && pageIndex >= pageCount - 1)}
+          aria-label="الصفحة التالية"
+          className="inline-flex size-10 items-center justify-center rounded-full bg-white/15 transition hover:bg-white/25 disabled:opacity-30"
+        >
+          <ChevronLeft className="size-5" />
+        </button>
+      </div>
+
+      <p className="mt-2 text-center text-xs text-white/50">اسحب الصفحة أو استخدم الأزرار والأسهم للتقليب</p>
     </div>
   );
 }
 
-/** قالب صفحة داخلية أفقية: خلفية معلم شفافة + زخرفة + ترويسة بالشعارات + ترقيم ثابت */
+/** أرقام عربية */
+function toArabic(n: number): string {
+  return String(n).replace(/\d/g, (d) => '٠١٢٣٤٥٦٧٨٩'[+d]);
+}
+
+/** صفحة صورة كبيرة أفقية مع عنوان قسم اختياري */
+function imagePage(
+  m: { id: string; processed_url: string | null; thumbnail_url: string | null; caption: string | null },
+  heading: string,
+  courseTitle: string,
+  pageNo: number,
+  showMoi: boolean,
+  sectionLabel?: string,
+) {
+  return (
+    <MagPage key={`img-${m.id}`} heading={heading} courseTitle={courseTitle} pageNo={pageNo} showMoi={showMoi}>
+      <div className="flex h-full flex-col">
+        {sectionLabel && (
+          <div className="mb-2 shrink-0">
+            <h2 className="text-lg font-semibold text-primary">{sectionLabel}</h2>
+            <div className="mt-1 h-1 w-12 rounded-full bg-secondary" />
+          </div>
+        )}
+        <div className="flex min-h-0 flex-1 items-center justify-center">
+          <div className="flex h-full max-h-full max-w-full items-center justify-center overflow-hidden rounded-xl border border-secondary/40 bg-white p-1.5 shadow-md">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={m.processed_url ?? m.thumbnail_url ?? ''}
+              alt={m.caption ?? ''}
+              className="max-h-full w-auto max-w-full rounded-lg object-contain"
+            />
+          </div>
+        </div>
+        {m.caption && (
+          <div className="mt-2 shrink-0 text-center">
+            <div className="mx-auto mb-1 h-0.5 w-10 rounded-full bg-secondary" />
+            <p className="text-[13px] font-medium text-primary">{m.caption}</p>
+          </div>
+        )}
+      </div>
+    </MagPage>
+  );
+}
+
+/**
+ * قالب صفحة داخلية أفقية بمواضع مثبّتة بشكل قاطع (absolute):
+ * الترويسة ملتصقة بالأعلى (عنوان الجلسة + الشعارات)، والتذييل ملتصق بالأسفل
+ * (رقم الصفحة + عنوان الدورة). هذا يضمن ثبات الترقيم أسفل كل صفحة دائمًا.
+ */
 function MagPage({
-  title,
+  heading,
+  courseTitle,
   pageNo,
-  watermark,
   showMoi,
   children,
 }: {
-  title: string;
+  heading: string;
+  courseTitle: string;
   pageNo: number;
-  watermark: string | null;
   showMoi: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <div className="flip-page magazine-pattern relative flex flex-col overflow-hidden">
-      {/* خلفية معلم المدينة شفافة جدًا على كل الصفحة */}
-      {watermark && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img src={watermark} alt="" className="pointer-events-none absolute inset-0 size-full object-cover opacity-[0.06]" />
-      )}
+    <div className="flip-page magazine-pattern relative overflow-hidden">
       {/* شريط جانبي أخضر */}
       <div className="absolute inset-y-0 right-0 w-1.5 bg-gradient-to-b from-primary to-primary-dark" />
 
-      {/* الترويسة: العنوان يمينًا ثم الشعارات مع فاصل شفاف */}
-      <div className="relative flex items-center justify-between px-6 pt-4">
-        <span className="truncate text-xs font-semibold text-primary">{title}</span>
-        <div className="flex shrink-0 items-center gap-2.5">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/logo-nauss.png" alt="" className="h-7 object-contain" />
-          {showMoi && (
-            <>
-              <span className="h-6 w-px bg-secondary/40" />
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-moi.png" alt="" className="h-7 object-contain" />
-            </>
-          )}
+      {/* الترويسة مثبّتة أعلى الصفحة: عنوان الجلسة يمينًا ثم الشعارات */}
+      <div className="absolute inset-x-0 top-0 px-6 pt-4">
+        <div className="flex items-center justify-between">
+          <span className="truncate pl-3 text-xs font-semibold text-primary">{heading}</span>
+          <div className="flex shrink-0 items-center gap-2.5">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/logo-nauss.png" alt="" className="h-7 object-contain" />
+            {showMoi && (
+              <>
+                <span className="h-6 w-px bg-secondary/40" />
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo-moi.png" alt="" className="h-7 object-contain" />
+              </>
+            )}
+          </div>
         </div>
+        <div className="mt-2 h-px bg-gradient-to-l from-transparent via-secondary to-transparent opacity-60" />
       </div>
-      <div className="relative mx-6 mt-2 h-px bg-gradient-to-l from-transparent via-secondary to-transparent opacity-60" />
 
-      {/* المحتوى */}
-      <div className="relative min-h-0 flex-1 px-7 py-3">{children}</div>
+      {/* المحتوى بين الترويسة والتذييل (يُقصّ إن زاد ليمنع أي تداخل) */}
+      <div className="absolute inset-x-0 bottom-12 top-16 overflow-hidden px-7">{children}</div>
 
-      {/* التذييل الثابت: رقم الصفحة يسارًا واسم البرنامج يمينًا */}
-      <div className="relative mx-6 mb-3 flex items-center justify-between border-t border-secondary/25 pt-2">
+      {/* التذييل مثبّت أسفل الصفحة: رقم الصفحة يسارًا وعنوان الدورة يمينًا */}
+      <div className="absolute inset-x-6 bottom-3 flex items-center justify-between border-t border-secondary/25 pt-2">
         <span className="flex size-6 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">{pageNo}</span>
-        <span className="text-[10px] tracking-wide text-muted">برامج الشراكات الدولية</span>
+        <span className="truncate pr-3 text-[10px] tracking-wide text-muted">{courseTitle}</span>
       </div>
     </div>
   );
