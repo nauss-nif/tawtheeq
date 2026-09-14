@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useTransition } from 'react';
-import { Plus, Trash2, Sparkles, Clock, User, Loader2, Pencil } from 'lucide-react';
+import { useEffect, useState, useTransition } from 'react';
+import { Plus, Trash2, Sparkles, Clock, User, Loader2, Pencil, ChevronUp, ChevronDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Card, CardTitle } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
@@ -13,6 +13,7 @@ import {
   addSessionAction,
   updateSessionAction,
   deleteSessionAction,
+  moveSessionAction,
   generateSessionDescriptionAction,
   importSessionsAction,
 } from './actions';
@@ -21,6 +22,18 @@ export function SessionsManager({ courseId, initial }: { courseId: string; initi
   const [pending, start] = useTransition();
   const [pasteOpen, setPasteOpen] = useState(false);
   const [pasteText, setPasteText] = useState('');
+  const [items, setItems] = useState<Session[]>(initial);
+  useEffect(() => setItems(initial), [initial]);
+
+  // نقل محور لأعلى/أسفل (فوري ثم حفظ في الخلفية)
+  function move(index: number, dir: 'up' | 'down') {
+    const swap = dir === 'up' ? index - 1 : index + 1;
+    if (swap < 0 || swap >= items.length) return;
+    const next = [...items];
+    [next[index], next[swap]] = [next[swap], next[index]];
+    setItems(next);
+    moveSessionAction(courseId, items[index].id, dir).catch(() => toast.error('تعذّر النقل'));
+  }
 
   return (
     <Card className="flex flex-col gap-5">
@@ -88,12 +101,18 @@ export function SessionsManager({ courseId, initial }: { courseId: string; initi
       </form>
 
       {/* قائمة الجلسات */}
-      {initial.length === 0 ? (
+      {items.length === 0 ? (
         <p className="py-4 text-center text-muted">لا توجد جلسات بعد.</p>
       ) : (
         <ul className="flex flex-col gap-3">
-          {initial.map((s) => (
-            <SessionRow key={s.id} session={s} courseId={courseId} />
+          {items.map((s, i) => (
+            <SessionRow
+              key={s.id}
+              session={s}
+              courseId={courseId}
+              onUp={i > 0 ? () => move(i, 'up') : undefined}
+              onDown={i < items.length - 1 ? () => move(i, 'down') : undefined}
+            />
           ))}
         </ul>
       )}
@@ -101,7 +120,17 @@ export function SessionsManager({ courseId, initial }: { courseId: string; initi
   );
 }
 
-function SessionRow({ session, courseId }: { session: Session; courseId: string }) {
+function SessionRow({
+  session,
+  courseId,
+  onUp,
+  onDown,
+}: {
+  session: Session;
+  courseId: string;
+  onUp?: () => void;
+  onDown?: () => void;
+}) {
   const [pending, start] = useTransition();
   const [desc, setDesc] = useState(session.description ?? '');
   const [editing, setEditing] = useState(false);
@@ -149,6 +178,27 @@ function SessionRow({ session, courseId }: { session: Session; courseId: string 
         )}
         {!editing && (
           <div className="flex gap-1">
+            {/* أسهم إعادة الترتيب */}
+            <div className="flex flex-col">
+              <button
+                onClick={onUp}
+                disabled={!onUp}
+                className="rounded-lg p-1 text-primary hover:bg-primary/5 disabled:opacity-25"
+                aria-label="نقل لأعلى"
+                title="نقل لأعلى"
+              >
+                <ChevronUp className="size-4" />
+              </button>
+              <button
+                onClick={onDown}
+                disabled={!onDown}
+                className="rounded-lg p-1 text-primary hover:bg-primary/5 disabled:opacity-25"
+                aria-label="نقل لأسفل"
+                title="نقل لأسفل"
+              >
+                <ChevronDown className="size-4" />
+              </button>
+            </div>
             <button onClick={() => setEditing(true)} className="rounded-xl p-2 text-primary hover:bg-primary/5" aria-label="تعديل">
               <Pencil className="size-4" />
             </button>

@@ -1,26 +1,23 @@
 import { notFound } from 'next/navigation';
 import type { Metadata } from 'next';
-import { createClient } from '@/lib/supabase/server';
 import { getMagazineBySlug } from '@/features/magazine/data';
-import { MagazineView } from '@/features/magazine/MagazineView';
+import { FlipStandalone } from '@/features/magazine/FlipStandalone';
 import { publicEnv } from '@/lib/env';
 
 interface Props {
   params: { slug: string };
 }
 
-/** Open Graph لمعاينة جميلة عند المشاركة + noindex للخصوصية */
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const data = await getMagazineBySlug(params.slug);
   if (!data) return { title: 'المجلة غير متاحة' };
-
   const { course } = data;
   const ogImage = `${publicEnv.siteUrl}/m/${params.slug}/og`;
-  const description = course.description?.slice(0, 160) ?? 'مجلة توثيق الدورة التدريبية';
+  const description = course.description?.slice(0, 160) ?? 'المجلة الإلكترونية للدورة التدريبية';
   return {
     title: course.title,
     description,
-    robots: { index: false, follow: false }, // noindex للمجلات (خصوصية)
+    robots: { index: false, follow: false },
     openGraph: {
       title: course.title,
       description,
@@ -33,13 +30,9 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   };
 }
 
-export default async function MagazinePage({ params }: Props) {
+/** رابط مستقل يفتح على المجلة الإلكترونية (Flipbook) مباشرةً */
+export default async function FlipPage({ params }: Props) {
   const data = await getMagazineBySlug(params.slug);
   if (!data) notFound();
-
-  // زيادة عدّاد المشاهدات عند كل زيارة (RPC آمنة، متاحة للزوار)
-  const supabase = createClient();
-  await supabase.rpc('increment_magazine_views', { p_slug: params.slug });
-
-  return <MagazineView data={data} siteUrl={publicEnv.siteUrl} />;
+  return <FlipStandalone data={data} slug={params.slug} />;
 }

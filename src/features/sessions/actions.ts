@@ -69,6 +69,24 @@ export async function updateSessionAction(sessionId: string, courseId: string, p
   return { success: 'تم الحفظ' };
 }
 
+/** نقل محور لأعلى/أسفل بتبديل ترتيبه مع جاره */
+export async function moveSessionAction(courseId: string, sessionId: string, dir: 'up' | 'down') {
+  await requireProfile();
+  const supabase = createClient();
+  const { data: rows } = await supabase
+    .from('sessions')
+    .select('id')
+    .eq('course_id', courseId)
+    .order('sort_order', { ascending: true });
+  const ids = (rows ?? []).map((r) => r.id);
+  const idx = ids.indexOf(sessionId);
+  const swap = dir === 'up' ? idx - 1 : idx + 1;
+  if (idx < 0 || swap < 0 || swap >= ids.length) return;
+  [ids[idx], ids[swap]] = [ids[swap], ids[idx]];
+  await Promise.all(ids.map((id, i) => supabase.from('sessions').update({ sort_order: i }).eq('id', id)));
+  revalidatePath(`/dashboard/courses/${courseId}`);
+}
+
 export async function deleteSessionAction(sessionId: string, courseId: string) {
   await requireProfile();
   const supabase = createClient();

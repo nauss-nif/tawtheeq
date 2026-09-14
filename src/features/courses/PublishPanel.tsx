@@ -17,6 +17,8 @@ export function PublishPanel({ course, siteUrl }: { course: Course; siteUrl: str
 
   const isPublished = course.status === 'published' && !!slug;
   const url = slug ? `${siteUrl}/m/${slug}` : '';
+  const flipUrl = slug ? `${siteUrl}/m/${slug}/flip` : '';
+  const [copiedFlip, setCopiedFlip] = useState(false);
 
   useEffect(() => {
     if (url) QRCode.toDataURL(url, { margin: 1, width: 220, color: { dark: '#0E5C50', light: '#FFFFFF' } }).then(setQr);
@@ -48,6 +50,13 @@ export function PublishPanel({ course, siteUrl }: { course: Course; siteUrl: str
     setTimeout(() => setCopied(false), 2000);
   }
 
+  async function copyFlip() {
+    await navigator.clipboard.writeText(flipUrl);
+    setCopiedFlip(true);
+    toast.success('تم نسخ رابط المجلة الإلكترونية');
+    setTimeout(() => setCopiedFlip(false), 2000);
+  }
+
   return (
     <Card className="flex flex-col gap-4">
       <CardTitle>النشر والمشاركة</CardTitle>
@@ -64,11 +73,26 @@ export function PublishPanel({ course, siteUrl }: { course: Course; siteUrl: str
       ) : (
         <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
           <div className="flex flex-1 flex-col gap-3">
-            <div className="flex items-center gap-2 rounded-2xl bg-background p-2">
-              <input readOnly value={url} dir="ltr" className="flex-1 bg-transparent px-2 text-sm text-primary outline-none" />
-              <button onClick={copy} className="rounded-xl p-2 text-primary hover:bg-primary/5" aria-label="نسخ">
-                {copied ? <Check className="size-5 text-primary" /> : <Copy className="size-5" />}
-              </button>
+            {/* رابط صفحة المجلة الكاملة */}
+            <div>
+              <span className="mb-1 block text-xs font-medium text-muted">رابط المجلة (صفحة كاملة)</span>
+              <div className="flex items-center gap-2 rounded-2xl bg-background p-2">
+                <input readOnly value={url} dir="ltr" className="flex-1 bg-transparent px-2 text-sm text-primary outline-none" />
+                <button onClick={copy} className="rounded-xl p-2 text-primary hover:bg-primary/5" aria-label="نسخ">
+                  {copied ? <Check className="size-5 text-primary" /> : <Copy className="size-5" />}
+                </button>
+              </div>
+            </div>
+
+            {/* رابط مستقل يفتح على المجلة الإلكترونية (تقليب) مباشرةً */}
+            <div>
+              <span className="mb-1 block text-xs font-medium text-muted">رابط المجلة الإلكترونية (تقليب مباشر)</span>
+              <div className="flex items-center gap-2 rounded-2xl border border-secondary/40 bg-background p-2">
+                <input readOnly value={flipUrl} dir="ltr" className="flex-1 bg-transparent px-2 text-sm text-primary outline-none" />
+                <button onClick={copyFlip} className="rounded-xl p-2 text-primary hover:bg-primary/5" aria-label="نسخ">
+                  {copiedFlip ? <Check className="size-5 text-primary" /> : <Copy className="size-5" />}
+                </button>
+              </div>
             </div>
             <div className="flex flex-wrap gap-2">
               <a href={url} target="_blank" rel="noopener noreferrer">
