@@ -12,6 +12,7 @@ import { PublishPanel } from '@/features/courses/PublishPanel';
 import { MediaUploader } from '@/features/media/MediaUploader';
 import { MediaGrid } from '@/features/media/MediaGrid';
 import { SessionsManager } from '@/features/sessions/SessionsManager';
+import { PromoPanel } from '@/features/promo/PromoPanel';
 
 export default async function CourseDetailPage({ params }: { params: { courseId: string } }) {
   await requireProfile();
@@ -37,7 +38,7 @@ export default async function CourseDetailPage({ params }: { params: { courseId:
     .order('sort_order', { ascending: true });
 
   return (
-    <div className="mx-auto max-w-4xl">
+    <div className="mx-auto max-w-6xl">
       <Link href="/dashboard/courses" className="mb-4 inline-flex items-center gap-1.5 text-sm text-muted hover:text-primary">
         <ArrowRight className="size-4" /> العودة للدورات
       </Link>
@@ -57,11 +58,12 @@ export default async function CourseDetailPage({ params }: { params: { courseId:
             </Card>
             <Card className="flex flex-col gap-4">
               <CardTitle>معرض الوسائط</CardTitle>
-              <MediaGrid courseId={course.id} initial={media ?? []} />
+              <MediaGrid courseId={course.id} initial={media ?? []} sessions={sessions ?? []} />
             </Card>
           </div>
         }
         sessions={<SessionsManager courseId={course.id} initial={sessions ?? []} />}
+        promo={<PromoPanel course={course} />}
         magazine={
           <div className="flex flex-col gap-6">
             <PublishPanel course={course} siteUrl={publicEnv.siteUrl} />

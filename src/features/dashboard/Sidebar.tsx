@@ -8,6 +8,7 @@ import {
   BookOpen,
   Users,
   BarChart3,
+  Library,
   Menu,
   X,
 } from 'lucide-react';
@@ -24,6 +25,7 @@ const icons = {
   courses: BookOpen,
   users: Users,
   stats: BarChart3,
+  library: Library,
 };
 
 /**
