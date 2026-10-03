@@ -7,7 +7,8 @@ import { getMagazineBySlug, type MagazineData } from '@/features/magazine/data';
 import { MagazinePDF, type PdfAssets } from '@/features/magazine/pdf';
 import { planImageAspects } from '@/features/magazine/pdfLayout';
 
-export const maxDuration = 120;
+// معالجة كل صور المجلة (قصّ ذكي وتحسين) قد تتجاوز دقيقتين للمجلات الكبيرة
+export const maxDuration = 300;
 
 /**
  * سلسلة التحسين الاحترافي التلقائي للصور:
