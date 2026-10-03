@@ -7,6 +7,7 @@ const navItems: NavItem[] = [
   { href: '/admin', label: 'الإحصائيات', icon: 'stats' },
   { href: '/admin/users', label: 'المنسقون', icon: 'users' },
   { href: '/admin/courses', label: 'كل الدورات', icon: 'courses' },
+  { href: '/admin/library', label: 'مكتبة البرومو', icon: 'library' },
 ];
 
 export default async function AdminLayout({ children }: { children: React.ReactNode }) {

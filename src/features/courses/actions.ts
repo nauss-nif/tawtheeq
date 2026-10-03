@@ -21,6 +21,12 @@ function parseForm(formData: FormData) {
   });
 }
 
+/** نص الترحيب الافتراضي (قابل للتعديل أو الحذف لاحقًا) */
+function defaultWelcomeText(title: string, location: string | null): string {
+  const city = location?.split(/[،,\-|/]/)[0].trim() || 'المدينة';
+  return `تحت إشراف برامج الشراكات الدولية بوزارة الداخلية، يسعدنا في جامعة نايف العربية للعلوم الأمنية – وكالة التدريب الترحيب بكم في دورتكم التدريبية "${title}" بمدينة ${city}.`;
+}
+
 export async function createCourseAction(formData: FormData) {
   const { userId } = await requireProfile();
   const parsed = parseForm(formData);
@@ -40,11 +46,19 @@ export async function createCourseAction(formData: FormData) {
       trainer_names: d.trainer_names,
       template_id: d.template_id,
       show_partnership_logo: d.show_partnership_logo,
+      welcome_text: defaultWelcomeText(d.title, d.location || null),
     })
     .select('id')
     .single();
 
   if (error) return { error: 'تعذّر إنشاء الدورة' };
+
+  // جلستان افتراضيتان (الأكثر تصويرًا في كل دورة): الافتتاح والتخريج
+  await supabase.from('sessions').insert([
+    { course_id: data.id, title: 'الافتتاح والتسجيل', sort_order: 0 },
+    { course_id: data.id, title: 'حفل التخريج والتقاط صورة جماعية', sort_order: 1 },
+  ]);
+
   revalidatePath('/dashboard/courses');
   redirect(`/dashboard/courses/${data.id}`);
 }
@@ -56,6 +70,7 @@ export async function updateCourseAction(courseId: string, formData: FormData) {
 
   const supabase = createClient();
   const d = parsed.data;
+  const welcome = String(formData.get('welcome_text') ?? '').trim();
   const { error } = await supabase
     .from('courses')
     .update({
@@ -67,6 +82,7 @@ export async function updateCourseAction(courseId: string, formData: FormData) {
       trainer_names: d.trainer_names,
       template_id: d.template_id,
       show_partnership_logo: d.show_partnership_logo,
+      welcome_text: welcome || null,
     })
     .eq('id', courseId); // RLS يضمن الملكية
 

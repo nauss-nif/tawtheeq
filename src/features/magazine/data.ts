@@ -1,6 +1,12 @@
 import { createClient } from '@/lib/supabase/server';
 import type { Course, Media, Session } from '@/lib/database.types';
-import { fetchLandmarkImage } from './landmark';
+import { cleanSessionTitle, tidyArabicText } from '@/lib/text';
+
+export interface MagazineCoordinator {
+  full_name: string;
+  job_title: string | null;
+  avatar_url: string | null;
+}
 
 export interface MagazineData {
   course: Course;
@@ -8,6 +14,7 @@ export interface MagazineData {
   images: Media[];
   videos: Media[];
   sessions: Session[];
+  coordinator: MagazineCoordinator | null; // مُعِدّ المجلة (صاحب الحساب)
   landmarkUrl: string | null; // صورة معلم المدينة (تلقائية)
 }
 
@@ -48,8 +55,31 @@ export async function getMagazineBySlug(slug: string): Promise<MagazineData | nu
     .eq('course_id', course.id)
     .order('sort_order', { ascending: true });
 
-  // صورة معلم المدينة تلقائيًا حسب مكان الدورة
-  const landmarkUrl = course.location ? await fetchLandmarkImage(course.location) : null;
+  // مُعِدّ المجلة: المنسق صاحب الحساب المسؤول عن الدورة
+  const { data: coord } = await supabase
+    .from('profiles')
+    .select('full_name, job_title, avatar_url')
+    .eq('id', course.coordinator_id)
+    .single();
+  const coordinator = coord ? (coord as MagazineCoordinator) : null;
 
-  return { course, cover, images, videos, sessions: sessions ?? [], landmarkUrl };
+  // أوقفنا الجلب التلقائي لصور المعالم (كانت ويكيبيديا تعيد صورًا مجمّعة رديئة تُفسد التصميم).
+  // نعتمد الآن على صورة غلاف الدورة المرفوعة + خلفية العلامة الأنيقة للجامعة.
+  const landmarkUrl = null;
+
+  // تنقية النصوص عند العرض: تصلح كل المجلات القائمة دون تعديل بياناتها المخزّنة
+  const cleanCourse: Course = {
+    ...course,
+    title: tidyArabicText(course.title),
+    description: tidyArabicText(course.description),
+    welcome_text: tidyArabicText(course.welcome_text),
+    location: tidyArabicText(course.location),
+  };
+  const cleanSessions = (sessions ?? []).map((s) => ({
+    ...s,
+    title: cleanSessionTitle(s.title),
+    description: tidyArabicText(s.description),
+  }));
+
+  return { course: cleanCourse, cover, images, videos, sessions: cleanSessions, coordinator, landmarkUrl };
 }

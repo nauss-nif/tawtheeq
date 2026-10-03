@@ -5,8 +5,60 @@ import sharp from 'sharp';
 import { renderToBuffer } from '@react-pdf/renderer';
 import { getMagazineBySlug, type MagazineData } from '@/features/magazine/data';
 import { MagazinePDF, type PdfAssets } from '@/features/magazine/pdf';
+import { planImageAspects } from '@/features/magazine/pdfLayout';
 
-export const maxDuration = 120;
+// معالجة كل صور المجلة (قصّ ذكي وتحسين) قد تتجاوز دقيقتين للمجلات الكبيرة
+export const maxDuration = 300;
+
+/**
+ * سلسلة التحسين الاحترافي التلقائي للصور:
+ * تصحيح الاتجاه، موازنة التباين، رفع الإشباع والسطوع قليلًا، وزيادة الوضوح.
+ */
+function enhance(img: sharp.Sharp): sharp.Sharp {
+  return img
+    .rotate() // احترام اتجاه EXIF
+    .modulate({ brightness: 1.03, saturation: 1.1 })
+    .normalize() // شدّ التباين تلقائيًا
+    .sharpen({ sigma: 0.7 });
+}
+
+/**
+ * قصّ ذكي نحو الوجوه/مركز الاهتمام إلى النسبة المطلوبة + تحسين احترافي.
+ * تُملأ الصورة موضعها في التصميم دون قصّ الوجوه.
+ */
+async function toSmartJpeg(
+  url: string,
+  aspect: number,
+  longSide = 1500,
+): Promise<{ src: string; w: number; h: number } | null> {
+  try {
+    const res = await fetch(url, { next: { revalidate: 3600 } });
+    if (!res.ok) return null;
+    const input = Buffer.from(await res.arrayBuffer());
+    let w: number;
+    let h: number;
+    if (aspect >= 1) {
+      w = longSide;
+      h = Math.round(longSide / aspect);
+    } else {
+      h = longSide;
+      w = Math.round(longSide * aspect);
+    }
+    const jpeg = await enhance(
+      sharp(input).resize({ width: w, height: h, fit: 'cover', position: sharp.strategy.attention }),
+    )
+      .jpeg({ quality: 84, mozjpeg: true })
+      .toBuffer();
+    const meta = await sharp(jpeg).metadata();
+    return {
+      src: `data:image/jpeg;base64,${jpeg.toString('base64')}`,
+      w: meta.width ?? w,
+      h: meta.height ?? h,
+    };
+  } catch {
+    return null;
+  }
+}
 
 /** يقرأ ملفًا من public ويعيده كـ data URL */
 async function fileDataUrl(rel: string, mime: string): Promise<string> {
@@ -19,54 +71,104 @@ async function fileDataUrl(rel: string, mime: string): Promise<string> {
  * @react-pdf لا يعرض WebP، لذا نحوّل كل صورة إلى JPEG على الخادم.
  */
 async function toJpegDataUrl(url: string, maxWidth: number): Promise<string | null> {
+  const r = await toJpegSized(url, maxWidth);
+  return r ? r.src : null;
+}
+
+/** يحوّل الصورة إلى JPEG ويعيد أبعادها الفعلية (لضبط الإطار بدقّة في الـPDF) */
+async function toJpegSized(
+  url: string,
+  maxWidth: number,
+): Promise<{ src: string; w: number; h: number } | null> {
   try {
     const res = await fetch(url, { next: { revalidate: 3600 } });
     if (!res.ok) return null;
     const input = Buffer.from(await res.arrayBuffer());
-    const jpeg = await sharp(input)
-      .resize({ width: maxWidth, withoutEnlargement: true })
-      .jpeg({ quality: 82 })
+    const jpeg = await enhance(sharp(input).resize({ width: maxWidth, withoutEnlargement: true }))
+      .jpeg({ quality: 84 })
       .toBuffer();
-    return `data:image/jpeg;base64,${jpeg.toString('base64')}`;
+    const meta = await sharp(jpeg).metadata();
+    return {
+      src: `data:image/jpeg;base64,${jpeg.toString('base64')}`,
+      w: meta.width ?? maxWidth,
+      h: meta.height ?? maxWidth,
+    };
   } catch {
     return null;
   }
 }
 
 async function buildAssets(data: MagazineData): Promise<PdfAssets> {
-  const [fontRegular, fontSemiBold, logoNauss, logoMoi, logoNaussWhite] = await Promise.all([
-    fileDataUrl('fonts/Cairo.ttf', 'font/ttf'),
-    fileDataUrl('fonts/Cairo.ttf', 'font/ttf'),
+  const [fontRegular, fontSemiBold, fontLatinRegular, fontLatinSemiBold, logoNauss, logoMoi, logoNaussWhite, logoStar] = await Promise.all([
+    fileDataUrl('fonts/ElMessiri-PDF-Regular.ttf', 'font/ttf'),
+    fileDataUrl('fonts/ElMessiri-PDF-SemiBold.ttf', 'font/ttf'),
+    fileDataUrl('fonts/NotoSans-LatinExt-400.woff', 'font/woff'),
+    fileDataUrl('fonts/NotoSans-LatinExt-600.woff', 'font/woff'),
     fileDataUrl('logo-nauss.png', 'image/png'),
     fileDataUrl('logo-moi.png', 'image/png'),
     fileDataUrl('logo-nauss-white.png', 'image/png'),
+    fileDataUrl('logo-star.png', 'image/png'),
   ]);
 
   const coverSrc = data.cover?.processed_url ?? data.landmarkUrl ?? null;
   const coverImage = coverSrc ? await toJpegDataUrl(coverSrc, 1400) : null;
+
+  // مُعِدّ المجلة (المنسق) مع صورته
+  const coordinator = data.coordinator
+    ? {
+        name: data.coordinator.full_name,
+        jobTitle: data.coordinator.job_title,
+        avatar: data.coordinator.avatar_url ? await toJpegDataUrl(data.coordinator.avatar_url, 240) : null,
+      }
+    : null;
   // معلم المدينة كخلفية شفافة (إن وُجد)
   const watermark = data.landmarkUrl ? await toJpegDataUrl(data.landmarkUrl, 900) : null;
 
-  // أول 12 صورة للمعرض (لتفادي ملفات ضخمة)
-  const gallery = data.images.slice(0, 16);
-  const images = (
-    await Promise.all(
-      gallery.map(async (m) => {
-        const src = await toJpegDataUrl(m.processed_url ?? m.thumbnail_url ?? '', 1200);
-        return src ? { src, caption: m.caption } : null;
-      }),
-    )
-  ).filter((x): x is { src: string; caption: string | null } => x !== null);
+  // خريطة أبعاد كل صورة حسب موضعها في التصميم (للقصّ الذكي نحو الوجوه)
+  const aspectById = planImageAspects(data.sessions, data.images);
+
+  // نحوّل الصور (لتفادي ملفات ضخمة نكتفي بحدٍّ معقول): قصّ ذكي + تحسين احترافي
+  // حدّ أعلى معقول لحجم الملف ووقت المعالجة (كان ٤٠ فتسقط صور المجلات الأكبر من الـPDF)
+  const gallery = data.images.slice(0, 80);
+  // ٦ صور في كل مرة مع إعادة محاولة: معالجة كل الصور دفعة واحدة كانت تُرهق دالة الخادم
+  // فتفشل بعض الصور بصمت وتسقط من الـPDF
+  const convert = async (m: (typeof gallery)[number]) => {
+    const url = m.processed_url ?? m.thumbnail_url ?? '';
+    const aspect = aspectById.get(m.id);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const r = aspect ? await toSmartJpeg(url, aspect) : await toJpegSized(url, 1200);
+      if (r) return { id: m.id, src: r.src, caption: m.caption, sessionId: m.session_id, w: r.w, h: r.h, width: m.width, height: m.height };
+    }
+    console.warn('[pdf] image dropped after retry:', m.id);
+    return null;
+  };
+  const converted = new Array<Awaited<ReturnType<typeof convert>>>(gallery.length);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(6, gallery.length) }, async () => {
+      while (next < gallery.length) {
+        const i = next++;
+        converted[i] = await convert(gallery[i]);
+      }
+    }),
+  );
+  const images = converted.filter(
+    (x): x is NonNullable<typeof x> => x !== null,
+  );
 
   return {
     fontRegular,
     fontSemiBold,
+    fontLatinRegular,
+    fontLatinSemiBold,
     logoNauss,
     logoMoi,
     logoNaussWhite,
+    logoStar,
     watermark,
     showMoi: data.course.show_partnership_logo,
     coverImage,
+    coordinator,
     images,
   };
 }

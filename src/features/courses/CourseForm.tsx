@@ -46,6 +46,15 @@ export function CourseForm({ course }: { course?: Course }) {
         </div>
         <Input name="location" label="المكان" defaultValue={course?.location ?? ''} />
 
+        {course && (
+          <Textarea
+            name="welcome_text"
+            label="نص ترحيب المجلة (يظهر في بداية المجلة — اتركه فارغًا لإخفائه)"
+            defaultValue={course.welcome_text ?? ''}
+            rows={4}
+          />
+        )}
+
         {/* أسماء المدربين — حقول ديناميكية */}
         <div className="flex flex-col gap-2">
           <label className="text-sm font-medium text-primary">أسماء المدربين</label>

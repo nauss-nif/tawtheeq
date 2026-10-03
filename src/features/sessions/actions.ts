@@ -4,6 +4,35 @@ import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireProfile } from '@/lib/session';
 import { generateSessionText, isAiConfigured } from '@/lib/ai';
+import { parseSchedule } from './parse';
+import { cleanSessionTitle, tidyArabicText } from '@/lib/text';
+
+/** لصق ذكي: يحلّل النص المنسوخ ويضيف الجلسات دفعة واحدة */
+export async function importSessionsAction(courseId: string, text: string) {
+  await requireProfile();
+  const parsed = parseSchedule(text);
+  if (parsed.length === 0) return { error: 'لم يتم التعرّف على جلسات في النص' };
+
+  const supabase = createClient();
+  const { count } = await supabase
+    .from('sessions')
+    .select('id', { count: 'exact', head: true })
+    .eq('course_id', courseId);
+  const base = count ?? 0;
+
+  const rows = parsed.map((p, i) => ({
+    course_id: courseId,
+    title: cleanSessionTitle(p.title),
+    time_label: p.time_label,
+    session_date: p.session_date,
+    sort_order: base + i,
+  }));
+
+  const { error } = await supabase.from('sessions').insert(rows);
+  if (error) return { error: 'تعذّر إضافة الجلسات' };
+  revalidatePath(`/dashboard/courses/${courseId}`);
+  return { success: `تمت إضافة ${parsed.length} جلسة`, count: parsed.length };
+}
 
 export async function addSessionAction(courseId: string, formData: FormData) {
   await requireProfile();
@@ -15,7 +44,7 @@ export async function addSessionAction(courseId: string, formData: FormData) {
 
   const { error } = await supabase.from('sessions').insert({
     course_id: courseId,
-    title: String(formData.get('title') ?? '').trim(),
+    title: cleanSessionTitle(String(formData.get('title') ?? '')),
     presenter: String(formData.get('presenter') ?? '').trim() || null,
     session_date: String(formData.get('session_date') ?? '') || null,
     time_label: String(formData.get('time_label') ?? '').trim() || null,
@@ -35,10 +64,30 @@ export async function updateSessionAction(sessionId: string, courseId: string, p
 }) {
   await requireProfile();
   const supabase = createClient();
+  if (patch.title !== undefined) patch = { ...patch, title: cleanSessionTitle(patch.title) };
+  if (patch.description) patch = { ...patch, description: tidyArabicText(patch.description) };
   const { error } = await supabase.from('sessions').update(patch).eq('id', sessionId);
   if (error) return { error: 'تعذّر حفظ الجلسة' };
   revalidatePath(`/dashboard/courses/${courseId}`);
   return { success: 'تم الحفظ' };
+}
+
+/** نقل محور لأعلى/أسفل بتبديل ترتيبه مع جاره */
+export async function moveSessionAction(courseId: string, sessionId: string, dir: 'up' | 'down') {
+  await requireProfile();
+  const supabase = createClient();
+  const { data: rows } = await supabase
+    .from('sessions')
+    .select('id')
+    .eq('course_id', courseId)
+    .order('sort_order', { ascending: true });
+  const ids = (rows ?? []).map((r) => r.id);
+  const idx = ids.indexOf(sessionId);
+  const swap = dir === 'up' ? idx - 1 : idx + 1;
+  if (idx < 0 || swap < 0 || swap >= ids.length) return;
+  [ids[idx], ids[swap]] = [ids[swap], ids[idx]];
+  await Promise.all(ids.map((id, i) => supabase.from('sessions').update({ sort_order: i }).eq('id', id)));
+  revalidatePath(`/dashboard/courses/${courseId}`);
 }
 
 export async function deleteSessionAction(sessionId: string, courseId: string) {
@@ -61,16 +110,28 @@ export async function generateSessionDescriptionAction(sessionId: string, course
     .single();
   const { data: course } = await supabase
     .from('courses')
-    .select('title')
+    .select('title, description, location')
     .eq('id', courseId)
     .single();
   if (!session || !course) return { error: 'بيانات غير مكتملة' };
 
+  // بقية محاور الدورة: لتمييز هذا المحور عنها وتنويع الصياغة
+  const { data: siblings } = await supabase
+    .from('sessions')
+    .select('id, title, description')
+    .eq('course_id', courseId)
+    .order('sort_order', { ascending: true });
+  const others = (siblings ?? []).filter((x) => x.id !== sessionId);
+
   try {
     const text = await generateSessionText({
       courseTitle: course.title,
+      courseDescription: course.description,
+      location: course.location,
       sessionTitle: session.title,
       presenter: session.presenter,
+      otherSessionTitles: others.map((x) => x.title),
+      existingDescriptions: others.map((x) => x.description ?? '').filter(Boolean),
     });
     await supabase.from('sessions').update({ description: text }).eq('id', sessionId);
     revalidatePath(`/dashboard/courses/${courseId}`);

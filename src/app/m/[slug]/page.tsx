@@ -14,20 +14,22 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const data = await getMagazineBySlug(params.slug);
   if (!data) return { title: 'المجلة غير متاحة' };
 
-  const { course, cover } = data;
-  const image = cover?.processed_url;
+  const { course } = data;
+  const ogImage = `${publicEnv.siteUrl}/m/${params.slug}/og`;
+  const description = course.description?.slice(0, 160) ?? 'مجلة توثيق الدورة التدريبية';
   return {
-    title: `${course.title} | مجلة الدورة`,
-    description: course.description?.slice(0, 160) ?? 'مجلة توثيق الدورة التدريبية',
+    title: course.title,
+    description,
     robots: { index: false, follow: false }, // noindex للمجلات (خصوصية)
     openGraph: {
       title: course.title,
-      description: course.description?.slice(0, 160) ?? '',
+      description,
       type: 'article',
-      images: image ? [{ url: image, width: 1200, height: 630 }] : [],
+      siteName: 'جامعة نايف العربية للعلوم الأمنية',
+      images: [{ url: ogImage, width: 1200, height: 630, type: 'image/jpeg' }],
       locale: 'ar_SA',
     },
-    twitter: { card: 'summary_large_image' },
+    twitter: { card: 'summary_large_image', title: course.title, description, images: [ogImage] },
   };
 }
 

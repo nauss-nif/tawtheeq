@@ -6,6 +6,7 @@ import { TopBar } from '@/features/dashboard/TopBar';
 const navItems: NavItem[] = [
   { href: '/dashboard', label: 'الرئيسية', icon: 'dashboard' },
   { href: '/dashboard/courses', label: 'دوراتي', icon: 'courses' },
+  { href: '/dashboard/courses/new', label: 'دورة جديدة', icon: 'new' },
 ];
 
 /** تخطيط لوحة المنسق (يستخدمه المدير أيضًا في وضع الموظف) */

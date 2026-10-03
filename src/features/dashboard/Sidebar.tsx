@@ -2,13 +2,14 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   BookOpen,
   Users,
   BarChart3,
+  Library,
+  PlusCircle,
   Menu,
   X,
 } from 'lucide-react';
@@ -25,6 +26,8 @@ const icons = {
   courses: BookOpen,
   users: Users,
   stats: BarChart3,
+  library: Library,
+  new: PlusCircle,
 };
 
 /**
@@ -35,8 +38,12 @@ export function Sidebar({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(true);
 
-  const isActive = (href: string) =>
-    pathname === href || (href !== '/dashboard' && href !== '/admin' && pathname.startsWith(href));
+  // العنصر النشط = أطول رابط يطابق بداية المسار (فلا تُضاء «دوراتي» داخل «دورة جديدة»)
+  const activeHref = items
+    .map((i) => i.href)
+    .filter((h) => pathname === h || pathname.startsWith(`${h}/`))
+    .sort((a, b) => b.length - a.length)[0];
+  const isActive = (href: string) => href === activeHref;
 
   return (
     <>
@@ -48,7 +55,13 @@ export function Sidebar({ items }: { items: NavItem[] }) {
         )}
       >
         <div className="flex items-center justify-between p-4">
-          {open && <Image src="/logo-nauss.svg" alt="توثيق" width={130} height={40} />}
+          {open && (
+            <div className="flex flex-col gap-2">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src="/logo-nauss-deep.png" alt="جامعة نايف العربية للعلوم الأمنية" className="h-14 w-auto object-contain" />
+              <span className="text-sm font-semibold text-primary">منصة توثيق الدورات</span>
+            </div>
+          )}
           <button
             onClick={() => setOpen((v) => !v)}
             className="rounded-xl p-2 text-primary hover:bg-primary/5"

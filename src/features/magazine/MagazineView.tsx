@@ -7,10 +7,13 @@ import { cn, formatArabicDate } from '@/lib/utils';
 import { TEMPLATES } from './templates';
 import type { MagazineData } from './data';
 import { Flipbook } from './Flipbook';
+import { sessionAccent, sessionOrdinal } from './accents';
+import { STAR_PATH, STAR_VIEWBOX } from './brandStar';
+import { groupByOrientation, orientationOf } from './imageLayout';
 
 const NAV = [
   { id: 'intro', label: 'تعريف' },
-  { id: 'sessions', label: 'الجلسات' },
+  { id: 'sessions', label: 'المحاور' },
   { id: 'gallery', label: 'المعرض' },
   { id: 'videos', label: 'الفيديو' },
   { id: 'trainers', label: 'المدربون' },
@@ -18,6 +21,14 @@ const NAV = [
 
 export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: string }) {
   const { course, cover, images, videos, sessions, landmarkUrl } = data;
+  // نجمع الصور حسب الجلسة لعرضها بجانب محاور الدورة
+  const bySession = new Map<string, typeof images>();
+  for (const sn of sessions) bySession.set(sn.id, []);
+  for (const m of images) {
+    if (m.session_id && bySession.has(m.session_id)) bySession.get(m.session_id)!.push(m);
+  }
+  const unassignedImages = images.filter((m) => !(m.session_id && bySession.has(m.session_id)));
+  const toArabic = (n: number) => String(n).replace(/\d/g, (d) => '٠١٢٣٤٥٦٧٨٩'[+d]);
   // خلفية الغلاف: صورة الغلاف التي اختارها المنسق أولًا، ثم معلم المدينة احتياطيًا
   const usingLandmark = !cover?.processed_url && !!landmarkUrl;
   const heroBg = cover?.processed_url ?? landmarkUrl ?? null;
@@ -64,50 +75,60 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
           scrolled ? 'bg-primary/95 shadow-soft backdrop-blur' : 'bg-transparent',
         )}
       >
-        <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3">
-          {/* العنوان + الشعارات (شفافة، مع فاصل خفيف) */}
-          <div className="flex items-center gap-3">
-            <span className={cn('max-w-[36vw] truncate font-semibold', scrolled ? 'text-white' : 'text-white drop-shadow')}>
-              {course.title}
-            </span>
-            <div className="hidden items-center gap-2.5 sm:flex">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-3">
+          {/* يمينًا: الشعارات ثم العنوان ثم روابط الأقسام */}
+          <div className="flex min-w-0 items-center gap-3">
+            {/* الشعارات (جامعة نايف ثم برامج الشراكات) */}
+            <div className="flex shrink-0 items-center gap-2.5">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-nauss-white.png" alt="جامعة نايف" className="h-8 object-contain drop-shadow" />
+              <img src="/logo-nauss-white.png" alt="جامعة نايف العربية للعلوم الأمنية" className="h-8 object-contain drop-shadow sm:h-9" />
               {course.show_partnership_logo && (
                 <>
-                  <span className="h-6 w-px bg-white/30" />
+                  <span className="h-7 w-px bg-white/30" />
                   {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src="/logo-moi-white.png" alt="برامج الشراكات الدولية" className="h-8 object-contain drop-shadow" />
+                  <img src="/logo-moi-white.png" alt="برامج الشراكات الدولية" className="h-8 object-contain drop-shadow sm:h-9" />
                 </>
               )}
             </div>
+            <span className="hidden h-8 w-px bg-white/25 lg:block" />
+            <span className={cn('hidden max-w-[22vw] truncate font-semibold text-white drop-shadow lg:block')}>
+              {course.title}
+            </span>
+            <div className="mr-2 hidden items-center gap-1 md:flex">
+              {NAV.map((n) => (
+                <a
+                  key={n.id}
+                  href={`#${n.id}`}
+                  className={cn(
+                    'rounded-xl px-2.5 py-1.5 text-sm text-white/90 transition-colors',
+                    scrolled ? 'hover:bg-white/10' : 'hover:bg-black/20',
+                  )}
+                >
+                  {n.label}
+                </a>
+              ))}
+            </div>
           </div>
-          <div className="hidden items-center gap-1 md:flex">
-            {NAV.map((n) => (
-              <a
-                key={n.id}
-                href={`#${n.id}`}
-                className={cn(
-                  'rounded-xl px-3 py-1.5 text-sm transition-colors',
-                  scrolled ? 'text-white/90 hover:bg-white/10' : 'text-white/90 hover:bg-black/20',
-                )}
-              >
-                {n.label}
-              </a>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
+          {/* يسارًا: الأزرار */}
+          <div className="flex shrink-0 items-center gap-2">
             <button
               onClick={() => setFlip(true)}
               className="inline-flex items-center gap-1.5 rounded-xl bg-secondary px-3 py-1.5 text-sm font-medium text-white hover:brightness-95"
             >
-              <BookOpen className="size-4" /> <span className="hidden sm:inline">تقليب</span>
+              <BookOpen className="size-4" /> <span className="hidden sm:inline">المجلة الإلكترونية</span>
             </button>
             <a
               href={`/m/${course.magazine_slug}/pdf`}
               className="inline-flex items-center gap-1.5 rounded-xl bg-white/15 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/25"
             >
               <Download className="size-4" /> <span className="hidden sm:inline">PDF</span>
+            </a>
+            <a
+              href={`/m/${course.magazine_slug}/offline`}
+              title="ملف HTML واحد يفتح على أي جهاز دون اتصال بالإنترنت"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-white/15 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/25"
+            >
+              <Download className="size-4" /> <span className="hidden sm:inline">نسخة دون اتصال</span>
             </a>
           </div>
         </div>
@@ -128,7 +149,7 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
         )}
         <div className="relative z-10 mx-auto w-full max-w-5xl px-6 pb-16 text-white">
           <div className={cn('mb-4 h-1.5 w-24 rounded-full', tpl.accent)} />
-          <p className="mb-2 text-sm font-medium text-secondary">برامج الشراكات الدولية</p>
+          <p className="mb-2 text-sm font-medium text-secondary">الدورة التدريبية</p>
           <h1 className={tpl.heroTitle}>{course.title}</h1>
           <div className="mt-4 flex flex-wrap gap-4 text-white/90">
             {course.start_date && (
@@ -146,6 +167,15 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
       </header>
 
       <main className="mx-auto max-w-5xl px-6 py-16">
+        {/* نص الترحيب (اختياري) */}
+        {course.welcome_text && (
+          <div className="mx-auto mb-14 max-w-3xl text-center">
+            <div className="mx-auto mb-5 h-1 w-16 rounded-full bg-secondary" />
+            <p className="text-xl font-medium leading-loose text-primary">{course.welcome_text}</p>
+            <div className="mx-auto mt-5 h-1 w-16 rounded-full bg-secondary" />
+          </div>
+        )}
+
         {/* قسم تعريفي */}
         {course.description && (
           <Section id="intro" title="عن الدورة" tpl={tpl}>
@@ -153,47 +183,123 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
           </Section>
         )}
 
-        {/* الجدول الزمني والجلسات */}
+        {/* محاور الدورة: كل المحاور تُذكر بعنوانها ووصفها، والصور إن وُجدت */}
         {sessions.length > 0 && (
-          <Section id="sessions" title="الجدول الزمني" tpl={tpl}>
-            <div className="flex flex-col gap-4">
-              {sessions.map((sn) => (
-                <motion.div
-                  key={sn.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  whileInView={{ opacity: 1, y: 0 }}
-                  viewport={{ once: true, margin: '-40px' }}
-                  transition={{ duration: 0.4 }}
-                  className="relative rounded-2xl border border-secondary/30 bg-surface p-5 shadow-soft"
-                >
-                  {/* شريط جانبي ذهبي */}
-                  <span className="absolute inset-y-4 right-0 w-1 rounded-full bg-secondary" />
-                  <div className="flex flex-wrap items-center gap-3">
-                    {sn.time_label && (
-                      <span dir="ltr" className="rounded-lg bg-primary/8 px-2.5 py-1 text-sm font-medium text-primary">
-                        {sn.time_label}
+          <Section id="sessions" title="محاور الدورة" tpl={tpl}>
+            <div className="flex flex-col gap-8">
+              {sessions.map((sn, i) => {
+                const sImgs = bySession.get(sn.id) ?? [];
+                const accent = sessionAccent(i);
+                const mainImg = sImgs[0];
+                // بقية الصور مجمّعة حسب الاتجاه: شبكة للأفقية وأخرى للطولية بنسب متطابقة
+                const rest = groupByOrientation(sImgs.slice(1));
+                const restGroups = rest.reduce<{ o: 'portrait' | 'landscape'; items: typeof rest }[]>((acc, m) => {
+                  const o = orientationOf(m);
+                  if (acc.length && acc[acc.length - 1].o === o) acc[acc.length - 1].items.push(m);
+                  else acc.push({ o, items: [m] });
+                  return acc;
+                }, []);
+                return (
+                  <motion.article
+                    key={sn.id}
+                    initial={{ opacity: 0, y: 24 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, margin: '-40px' }}
+                    transition={{ duration: 0.45 }}
+                    className="relative grid gap-6 overflow-hidden rounded-3xl border border-secondary/30 border-r-4 bg-surface p-6 shadow-soft md:grid-cols-5"
+                    style={{ borderRightColor: accent.main, background: `radial-gradient(70% 90% at 100% 0%, ${accent.tint} 0%, #fff 55%)` }}
+                  >
+                    {/* نجمة الجامعة بلون المحور تخرج من زاوية البطاقة */}
+                    <svg aria-hidden viewBox={STAR_VIEWBOX} className="pointer-events-none absolute -bottom-24 -left-24 size-72">
+                      <path d={STAR_PATH} fill={accent.main} fillOpacity={0.07} fillRule="evenodd" />
+                    </svg>
+                    {/* النص */}
+                    <div className={`relative ${mainImg ? 'md:col-span-2' : 'md:col-span-5'}`}>
+                      <span className="flex items-center gap-2 text-xs font-bold tracking-wide" style={{ color: accent.main }}>
+                        <span
+                          className="flex h-7 w-9 items-center justify-center rounded-l-lg rounded-r-sm text-[13px] text-white shadow-sm"
+                          style={{ background: `linear-gradient(135deg, ${accent.main}, ${accent.deep})` }}
+                        >
+                          {toArabic(i + 1)}
+                        </span>
+                        الجلسة {sessionOrdinal(i)}
                       </span>
+                      <h3 className="mt-3 text-xl font-semibold" style={{ color: accent.deep }}>{sn.title}</h3>
+                      <div className="mt-1.5 mb-3 h-1 w-14 rounded-full" style={{ background: `linear-gradient(to left, ${accent.main}, #B99C6B)` }} />
+                      <div className="flex flex-wrap gap-3 text-sm text-muted">
+                        {sn.presenter && <span>المقدّم: {sn.presenter}</span>}
+                        {sn.time_label && <span dir="ltr">{sn.time_label}</span>}
+                        {sn.session_date && <span>{formatArabicDate(sn.session_date)}</span>}
+                      </div>
+                      {sn.description ? (
+                        <p className="mt-3 leading-loose text-[#2a302d]">{sn.description}</p>
+                      ) : (
+                        <p className="mt-3 leading-loose text-muted">جلسة ضمن محاور الدورة التدريبية.</p>
+                      )}
+                    </div>
+
+                    {/* الصورة الرئيسية للمحور بجوار النص */}
+                    {mainImg && (
+                      <button
+                        type="button"
+                        onClick={() => setLightbox(images.findIndex((x) => x.id === mainImg.id))}
+                        className="relative flex cursor-zoom-in items-center justify-center overflow-hidden rounded-2xl border border-secondary/30 bg-background md:col-span-3"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={mainImg.processed_url ?? mainImg.thumbnail_url ?? ''}
+                          alt={mainImg.caption ?? sn.title}
+                          className={`w-full transition-transform duration-500 hover:scale-[1.02] ${orientationOf(mainImg) === 'portrait' ? 'max-h-[460px] object-contain' : 'aspect-[4/3] object-cover'}`}
+                        />
+                      </button>
                     )}
-                    <h3 className="text-lg font-semibold text-primary">{sn.title}</h3>
-                  </div>
-                  <div className="mt-1 flex flex-wrap gap-3 text-sm text-muted">
-                    {sn.presenter && <span>المقدّم: {sn.presenter}</span>}
-                    {sn.session_date && <span>{formatArabicDate(sn.session_date)}</span>}
-                  </div>
-                  {sn.description && (
-                    <p className="mt-3 leading-loose text-[#2a302d]">{sn.description}</p>
-                  )}
-                </motion.div>
-              ))}
+
+                    {/* بقية الصور: شبكة لكل اتجاه بنسب متطابقة فتبدو مرتبة */}
+                    {restGroups.length > 0 && (
+                      <div className="relative flex flex-col gap-3 md:col-span-5">
+                        {restGroups.map((g, gi) => (
+                          <div
+                            key={gi}
+                            className={`grid gap-3 ${
+                              g.o === 'portrait'
+                                ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
+                                : g.items.length >= 3
+                                  ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+                                  : 'grid-cols-1 sm:grid-cols-2'
+                            }`}
+                          >
+                            {g.items.map((m) => (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => setLightbox(images.findIndex((x) => x.id === m.id))}
+                                className="group/img overflow-hidden rounded-2xl border border-secondary/30 bg-background"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={m.processed_url ?? m.thumbnail_url ?? ''}
+                                  alt={m.caption ?? sn.title}
+                                  loading="lazy"
+                                  className={`w-full cursor-zoom-in object-cover transition-transform duration-500 group-hover/img:scale-105 ${g.o === 'portrait' ? 'aspect-[3/4]' : 'aspect-[4/3]'}`}
+                                />
+                              </button>
+                            ))}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </motion.article>
+                );
+              })}
             </div>
           </Section>
         )}
 
-        {/* معرض الصور */}
-        {images.length > 0 && (
-          <Section id="gallery" title="معرض الصور" tpl={tpl}>
+        {/* صور من الدورة (غير المرتبطة بمحور) — بلا تكرار لصور المحاور */}
+        {unassignedImages.length > 0 && (
+          <Section id="gallery" title="صور من الدورة" tpl={tpl}>
             <div className="columns-1 gap-5 sm:columns-2 lg:columns-3 [&>*]:mb-5">
-              {images.map((m, i) => (
+              {unassignedImages.map((m) => (
                 <motion.figure
                   key={m.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -201,7 +307,7 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
                   viewport={{ once: true, margin: '-40px' }}
                   transition={{ duration: 0.4 }}
                   className="group cursor-zoom-in overflow-hidden rounded-2xl border border-secondary/40 bg-surface p-2 shadow-soft transition-all duration-300 hover:-translate-y-1 hover:shadow-soft-md"
-                  onClick={() => setLightbox(i)}
+                  onClick={() => setLightbox(images.findIndex((x) => x.id === m.id))}
                 >
                   <div className="overflow-hidden rounded-xl">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -249,6 +355,34 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
                   <Users className="size-5 text-secondary" /> <span className="font-medium text-primary">{name}</span>
                 </span>
               ))}
+            </div>
+          </Section>
+        )}
+
+        {/* مُعِدّ المجلة (المنسق المسؤول) */}
+        {data.coordinator && (
+          <Section id="editor" title="إعداد المجلة" tpl={tpl}>
+            <div className="flex items-center gap-5 rounded-3xl border border-secondary/30 bg-surface p-6 shadow-soft">
+              {data.coordinator.avatar_url ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={data.coordinator.avatar_url}
+                  alt={data.coordinator.full_name}
+                  className="size-24 shrink-0 rounded-full border-2 border-secondary/50 object-cover"
+                />
+              ) : (
+                <span className="flex size-24 shrink-0 items-center justify-center rounded-full border-2 border-secondary/40 bg-background">
+                  <Users className="size-10 text-secondary" />
+                </span>
+              )}
+              <div>
+                <p className="text-xl font-semibold text-primary">{data.coordinator.full_name}</p>
+                <div className="mt-1 mb-2 h-1 w-12 rounded-full bg-secondary" />
+                <p className="text-muted">
+                  {data.coordinator.job_title || 'منسّق الدورة'}
+                </p>
+                <p className="mt-1 text-sm text-muted">إدارة عمليات التدريب · جامعة نايف العربية للعلوم الأمنية</p>
+              </div>
             </div>
           </Section>
         )}

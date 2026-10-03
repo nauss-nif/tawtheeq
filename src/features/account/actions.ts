@@ -11,6 +11,8 @@ const profileSchema = z.object({
     .string()
     .regex(/^05\d{8}$/, 'رقم الجوال يجب أن يبدأ بـ 05 ويتكون من 10 أرقام')
     .or(z.literal('')),
+  job_title: z.string().max(80, 'المسمّى الوظيفي طويل جدًا').optional(),
+  avatar_url: z.string().url().or(z.literal('')).optional(),
 });
 
 /** تعديل بيانات الحساب الشخصي (الاسم والجوال) — لأي مستخدم مسجّل */
@@ -19,13 +21,20 @@ export async function updateOwnProfileAction(_prev: unknown, formData: FormData)
   const parsed = profileSchema.safeParse({
     full_name: formData.get('full_name'),
     phone: formData.get('phone') ?? '',
+    job_title: formData.get('job_title') ?? '',
+    avatar_url: formData.get('avatar_url') ?? '',
   });
   if (!parsed.success) return { error: parsed.error.errors[0].message };
 
   const supabase = createClient();
   const { error } = await supabase
     .from('profiles')
-    .update({ full_name: parsed.data.full_name, phone: parsed.data.phone || null })
+    .update({
+      full_name: parsed.data.full_name,
+      phone: parsed.data.phone || null,
+      job_title: parsed.data.job_title || null,
+      avatar_url: parsed.data.avatar_url || null,
+    })
     .eq('id', userId); // سياسة RLS تسمح للمستخدم بتعديل ملفه
 
   if (error) return { error: 'تعذّر حفظ البيانات' };

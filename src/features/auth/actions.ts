@@ -67,11 +67,11 @@ export async function loginAction(_prev: ActionState, formData: FormData): Promi
   if (!profile) return { error: 'تعذّر تحميل بيانات الحساب' };
 
   if (profile.status === 'pending') {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
     return { error: 'حسابك بانتظار التفعيل من قبل المدير' };
   }
   if (profile.status === 'disabled') {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: 'local' });
     return { error: 'تم تعطيل حسابك، تواصل مع الإدارة' };
   }
 
@@ -92,7 +92,8 @@ export async function resetPasswordAction(_prev: ActionState, formData: FormData
 
 export async function logoutAction() {
   const supabase = createClient();
-  await supabase.auth.signOut();
+  // scope: 'local' — إنهاء جلسة هذا المتصفح فقط، لا كل أجهزة المستخدم
+  await supabase.auth.signOut({ scope: 'local' });
   revalidatePath('/', 'layout');
   redirect('/auth/login');
 }
