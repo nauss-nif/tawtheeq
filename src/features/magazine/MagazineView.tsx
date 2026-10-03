@@ -7,7 +7,8 @@ import { cn, formatArabicDate } from '@/lib/utils';
 import { TEMPLATES } from './templates';
 import type { MagazineData } from './data';
 import { Flipbook } from './Flipbook';
-import { sessionAccent } from './accents';
+import { sessionAccent, sessionOrdinal } from './accents';
+import { STAR_PATH, STAR_VIEWBOX } from './brandStar';
 
 const NAV = [
   { id: 'intro', label: 'تعريف' },
@@ -195,19 +196,26 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true, margin: '-40px' }}
                     transition={{ duration: 0.45 }}
-                    className="grid gap-6 rounded-3xl border border-secondary/30 border-r-4 bg-surface p-6 shadow-soft md:grid-cols-2"
-                    style={{ borderRightColor: accent.main }}
+                    className="relative grid gap-6 overflow-hidden rounded-3xl border border-secondary/30 border-r-4 bg-surface p-6 shadow-soft md:grid-cols-2"
+                    style={{ borderRightColor: accent.main, background: `radial-gradient(70% 90% at 100% 0%, ${accent.tint} 0%, #fff 55%)` }}
                   >
+                    {/* نجمة الجامعة بلون المحور تخرج من زاوية البطاقة */}
+                    <svg aria-hidden viewBox={STAR_VIEWBOX} className="pointer-events-none absolute -bottom-24 -left-24 size-72">
+                      <path d={STAR_PATH} fill={accent.main} fillOpacity={0.07} fillRule="evenodd" />
+                    </svg>
                     {/* النص */}
-                    <div className={sImgs.length === 0 ? 'md:col-span-2' : ''}>
-                      <span
-                        className="inline-block rounded-full px-3 py-1 text-xs font-bold"
-                        style={{ backgroundColor: accent.tint, color: accent.main }}
-                      >
-                        الجلسة {toArabic(i + 1)}
+                    <div className={`relative ${sImgs.length === 0 ? 'md:col-span-2' : ''}`}>
+                      <span className="flex items-center gap-2 text-xs font-bold tracking-wide" style={{ color: accent.main }}>
+                        <span
+                          className="flex h-7 w-9 items-center justify-center rounded-l-lg rounded-r-sm text-[13px] text-white shadow-sm"
+                          style={{ background: `linear-gradient(135deg, ${accent.main}, ${accent.deep})` }}
+                        >
+                          {toArabic(i + 1)}
+                        </span>
+                        الجلسة {sessionOrdinal(i)}
                       </span>
-                      <h3 className="mt-3 text-xl font-semibold" style={{ color: accent.main }}>{sn.title}</h3>
-                      <div className="mt-1 mb-3 h-1 w-12 rounded-full" style={{ backgroundColor: accent.main }} />
+                      <h3 className="mt-3 text-xl font-semibold" style={{ color: accent.deep }}>{sn.title}</h3>
+                      <div className="mt-1.5 mb-3 h-1 w-14 rounded-full" style={{ background: `linear-gradient(to left, ${accent.main}, #B99C6B)` }} />
                       <div className="flex flex-wrap gap-3 text-sm text-muted">
                         {sn.presenter && <span>المقدّم: {sn.presenter}</span>}
                         {sn.time_label && <span dir="ltr">{sn.time_label}</span>}
@@ -222,7 +230,7 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
 
                     {/* كل صور المحور (قابلة للتكبير) */}
                     {sImgs.length > 0 && (
-                      <div className={`grid content-start gap-3 ${sImgs.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                      <div className={`relative grid content-start gap-3 ${sImgs.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                         {sImgs.map((m) => (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img

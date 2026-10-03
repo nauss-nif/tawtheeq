@@ -7,11 +7,18 @@ import {
   Image,
   StyleSheet,
   Font,
+  Svg,
+  Path,
+  Defs,
+  LinearGradient,
+  Stop,
+  Rect,
 } from '@react-pdf/renderer';
 import type { Style } from '@react-pdf/types';
 import type { Course, Session } from '@/lib/database.types';
 import { formatDateRange, toArabicDigits as toArabic } from '@/lib/text';
-import { sessionAccent, type SessionAccent } from './accents';
+import { GOLD, sessionAccent, sessionOrdinal, tabTopRatio, type SessionAccent } from './accents';
+import { STAR_H, STAR_PATH, STAR_VIEWBOX, STAR_W } from './brandStar';
 import { PDF_PAGE, PDF_HERO_BAND, PDF_TITLE_BAND } from './pdfLayout';
 import { pdfText, splitArabicLatin } from './pdfText';
 
@@ -123,6 +130,47 @@ function TrainerChip({ name }: { name: string }) {
   );
 }
 
+type Pos = { top?: number; bottom?: number; left?: number; right?: number };
+
+/**
+ * نجمة شعار الجامعة المتجهة بلون وشفافية محددين، تُوضع مقصوصة عند الزوايا.
+ * تُلفّ بإطار مطلق بحجم حاويتها يقصّ ما يتجاوز الحافة: عنصر يمتد خارج الصفحة
+ * يُدخل محرّك التقسيم في @react-pdf في حلقة لا نهائية حين يقترب المحتوى من ملء الصفحة.
+ */
+function PdfStar({ color, opacity, size, ...pos }: { color: string; opacity: number; size: number } & Pos) {
+  return (
+    <View fixed style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, overflow: 'hidden' }}>
+      <Svg viewBox={STAR_VIEWBOX} style={{ position: 'absolute', width: size, height: (size * STAR_H) / STAR_W, ...pos }}>
+        <Path d={STAR_PATH} fill={color} fillOpacity={opacity} fillRule="evenodd" />
+      </Svg>
+    </View>
+  );
+}
+
+/** لسان فهرسة على الحافة اليمنى بلون المحور، يتدرّج موضعه من محور لآخر */
+function PdfTab({ accent, index }: { accent: SessionAccent; index: number }) {
+  const top = tabTopRatio(index) * PDF_PAGE[1];
+  const id = `tab-${index}`;
+  return (
+    <View style={{ position: 'absolute', right: 0, top, width: 30, height: 66 }}>
+      <Svg viewBox="0 0 30 66" style={{ position: 'absolute', top: 0, left: 0, width: 30, height: 66 }}>
+        <Defs>
+          <LinearGradient id={id} x1="0" y1="0" x2="0" y2="1">
+            <Stop offset="0" stopColor={accent.main} />
+            <Stop offset="1" stopColor={accent.deep} />
+          </LinearGradient>
+        </Defs>
+        {/* مستطيل أعرض من اللسان: زواياه اليمنى خارج الصفحة فتبقى الزاويتان اليسريان مدوّرتين */}
+        <Rect x="0" y="0" width="44" height="66" rx="10" fill={`url(#${id})`} />
+      </Svg>
+      <T style={{ position: 'absolute', top: 12, left: 0, width: 30, textAlign: 'center', color: '#fff', fontSize: 15, fontWeight: 600 }}>
+        {toArabic(index + 1)}
+      </T>
+      <PdfStar color="#ffffff" opacity={0.85} size={10} top={42} left={10} />
+    </View>
+  );
+}
+
 /** ترويسة الصفحة الداخلية */
 function Header({ heading, star }: { heading: string; star: string }) {
   return (
@@ -147,19 +195,24 @@ function Footer({ n, courseTitle }: { n: number; courseTitle: string }) {
 }
 
 /** صفحة صورة كبيرة تملأ الصفحة، فوقها عنوان المحور بلونه */
-function bigImagePage(key: string, title: string, src: string, n: number, accent?: SessionAccent) {
+function bigImagePage(key: string, title: string, src: string, n: number, accent?: SessionAccent, tabIndex?: number) {
   const color = accent?.main ?? C.primary;
   return (
     <Page key={`bi-${key}`} size={PDF_PAGE} style={{ fontFamily: FONT, backgroundColor: C.bg }}>
-      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: PDF_TITLE_BAND, paddingLeft: 36, paddingRight: 40, justifyContent: 'center' }}>
-        <T style={{ color, fontSize: 15, fontWeight: 600, textAlign: 'right', lineHeight: 1.35 }}>{title}</T>
-        <View style={{ width: 50, height: 3, backgroundColor: C.secondary, borderRadius: 2, marginTop: 6, alignSelf: 'flex-end' }} />
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: PDF_TITLE_BAND, overflow: 'hidden', backgroundColor: accent?.tint ?? C.bg }}>
+        <PdfStar color={color} opacity={0.14} size={230} top={-80} left={-70} />
       </View>
-      <View style={{ position: 'absolute', top: 0, right: 0, width: 6, height: PDF_TITLE_BAND, backgroundColor: color }} />
+      <View style={{ position: 'absolute', top: 0, left: 0, right: 0, height: PDF_TITLE_BAND, paddingLeft: 36, paddingRight: tabIndex !== undefined ? 46 : 36, justifyContent: 'center' }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 8 }}>
+          <T style={{ color: accent?.deep ?? C.primary, fontSize: 15, fontWeight: 600, textAlign: 'right', lineHeight: 1.35, maxWidth: 470 }}>{title}</T>
+          <View style={{ width: 20, height: 3, backgroundColor: color, borderRadius: 2 }} />
+        </View>
+      </View>
       <View style={{ position: 'absolute', left: 0, right: 0, top: PDF_TITLE_BAND, height: 4, backgroundColor: color }} />
       <View style={{ position: 'absolute', left: 0, right: 0, top: PDF_TITLE_BAND + 4, bottom: 0 }}>
         <Image src={src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
       </View>
+      {accent && tabIndex !== undefined ? <PdfTab accent={accent} index={tabIndex} /> : null}
       <T style={[s.pageBadge, { backgroundColor: color }]}>{toArabic(n)}</T>
     </Page>
   );
@@ -216,6 +269,7 @@ export function MagazinePDF({
             <Image src={assets.coverImage} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
           )}
           <View style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', backgroundColor: 'rgba(10,74,64,0.45)' }} />
+          <PdfStar color="#ffffff" opacity={0.1} size={470} top={-150} left={-150} />
           <View style={{ position: 'absolute', top: 14, left: 14, right: 14, bottom: 14, border: `1.5px solid ${C.secondary}`, borderRadius: 6 }} />
           <View style={{ position: 'absolute', bottom: 0, left: 0, width: '100%', backgroundColor: 'rgba(10,74,64,0.88)', paddingVertical: 24, paddingHorizontal: 34 }}>
             <View style={{ width: 64, height: 4, backgroundColor: C.secondary, borderRadius: 3, marginBottom: 12 }} />
@@ -233,6 +287,7 @@ export function MagazinePDF({
       {/* ===== صفحة الترحيب (اختيارية) ===== */}
       {course.welcome_text ? (
         <Page size={PDF_PAGE} style={s.page}>
+          <PdfStar color={GOLD.main} opacity={0.14} size={400} bottom={-130} right={-130} />
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 58 }}>
             <Image src={assets.logoStar} style={{ width: 40, height: 40, objectFit: 'contain', marginBottom: 22 }} />
             <View style={{ width: 64, height: 4, backgroundColor: C.secondary, borderRadius: 2, marginBottom: 24 }} />
@@ -245,6 +300,7 @@ export function MagazinePDF({
 
       {/* ===== عن الدورة + المدربون + إعداد المجلة ===== */}
       <Page size={PDF_PAGE} style={s.page}>
+        <PdfStar color={GOLD.main} opacity={0.14} size={400} bottom={-130} right={-130} />
         <Header heading={course.title} star={assets.logoStar} />
         <View style={[s.body, { flex: 1, justifyContent: 'center', paddingBottom: 46 }]}>
           {course.description ? (
@@ -290,6 +346,7 @@ export function MagazinePDF({
       {/* ===== المحتويات: صفحة مستقلة — رقم المحور بلونه، العنوان، ثم رقم الصفحة ===== */}
       {sessions.length > 0 ? (
         <Page size={PDF_PAGE} style={s.page}>
+          <PdfStar color={GOLD.main} opacity={0.14} size={400} bottom={-130} right={-130} />
           <Header heading="المحتويات" star={assets.logoStar} />
           <View style={[s.body, { flex: 1, justifyContent: 'center', paddingBottom: 46 }]}>
             <T style={[s.h2, { fontSize: 22 }]}>المحتويات</T>
@@ -299,9 +356,9 @@ export function MagazinePDF({
               return (
                 <View key={sn.id} wrap={false} style={{ flexDirection: 'row', alignItems: 'center', minHeight: tocRow, gap: 8 }}>
                   <T style={{ fontSize: tocFont, color: C.muted, width: 20, textAlign: 'left' }}>{toArabic(sessionStart[i])}</T>
-                  <View style={{ flex: 1, minWidth: 16, borderBottom: `1px dotted ${C.secondary}`, marginTop: 5 }} />
-                  <T style={{ fontSize: tocFont, color: C.ink, textAlign: 'right', maxWidth: 410 }}>{sn.title}</T>
-                  <T style={{ fontSize: tocFont - 2, fontWeight: 600, color: '#fff', backgroundColor: ac.main, borderRadius: 9, width: 19, textAlign: 'center', paddingVertical: 1 }}>
+                  <View style={{ flex: 1, minWidth: 16, borderBottom: `1px dotted ${ac.main}88`, marginTop: 5 }} />
+                  <T style={{ fontSize: tocFont, color: ac.deep, textAlign: 'right', maxWidth: 410 }}>{sn.title}</T>
+                  <T style={{ fontSize: tocFont - 2, fontWeight: 600, color: '#fff', backgroundColor: ac.main, borderTopLeftRadius: 8, borderBottomLeftRadius: 8, borderTopRightRadius: 2, borderBottomRightRadius: 2, width: 26, textAlign: 'center', paddingVertical: 2 }}>
                     {toArabic(i + 1)}
                   </T>
                 </View>
@@ -334,13 +391,15 @@ export function MagazinePDF({
             </View>
 
             {/* منطقة النص */}
-            <View style={{ position: 'absolute', left: 0, right: 0, [imageTop ? 'top' : 'bottom']: BAND, [imageTop ? 'bottom' : 'top']: 0, paddingLeft: 40, paddingRight: 44, justifyContent: 'center' }}>
-              <View style={{ position: 'absolute', top: 0, bottom: 0, right: 0, width: 6, backgroundColor: ac.main }} />
+            <View style={{ position: 'absolute', left: 0, right: 0, [imageTop ? 'top' : 'bottom']: BAND, [imageTop ? 'bottom' : 'top']: 0, paddingLeft: 40, paddingRight: 50, justifyContent: 'center', overflow: 'hidden' }}>
+              {/* نجمة الجامعة بلون المحور تخرج من الزاوية الخارجية */}
+              <PdfStar color={ac.main} opacity={0.1} size={330} right={-110} {...(imageTop ? { bottom: -110 } : { top: -110 })} />
               <T style={{ position: 'absolute', top: 2, left: 24, fontSize: 110, fontWeight: 600, color: ac.tint }}>{toArabic(i + 1)}</T>
-              <T style={{ alignSelf: 'flex-end', color: ac.main, backgroundColor: ac.tint, fontSize: 10, fontWeight: 600, borderRadius: 9, paddingHorizontal: 10, paddingVertical: 1 }}>
-                الجلسة {toArabic(i + 1)}
-              </T>
-              <T style={{ color: ac.main, fontSize: 18, fontWeight: 600, textAlign: 'right', marginTop: 6, lineHeight: 1.35 }}>{sn.title}</T>
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 6 }}>
+                <T style={{ color: ac.main, fontSize: 10.5, fontWeight: 600 }}>الجلسة {sessionOrdinal(i)}</T>
+                <View style={{ width: 20, height: 3, backgroundColor: ac.main, borderRadius: 2 }} />
+              </View>
+              <T style={{ color: ac.deep, fontSize: 19, fontWeight: 600, textAlign: 'right', marginTop: 6, lineHeight: 1.35 }}>{sn.title}</T>
               <View style={{ width: 52, height: 3, backgroundColor: C.secondary, borderRadius: 2, marginTop: 7, marginBottom: 10, alignSelf: 'flex-end' }} />
               {sn.presenter || sn.time_label ? (
                 <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 14, marginBottom: 8 }}>
@@ -351,11 +410,12 @@ export function MagazinePDF({
               {sn.description ? <T style={{ fontSize: 11, lineHeight: 1.85, textAlign: 'right', color: C.ink }}>{sn.description}</T> : null}
             </View>
 
+            <PdfTab accent={ac} index={i} />
             <T style={[s.pageBadge, { backgroundColor: ac.main }]}>{toArabic(heroNo)}</T>
           </Page>,
         ];
         rest.forEach((img, j) => {
-          pages.push(bigImagePage(`${sn.id}-${j}`, sn.title, img.src, ++pageNo, ac));
+          pages.push(bigImagePage(`${sn.id}-${j}`, sn.title, img.src, ++pageNo, ac, i));
         });
         return pages;
       })}
@@ -369,6 +429,7 @@ export function MagazinePDF({
           {assets.watermark ? (
             <Image src={assets.watermark} style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.14 }} />
           ) : null}
+          <PdfStar color={C.secondary} opacity={0.16} size={500} bottom={-170} right={-170} />
           <View style={{ position: 'absolute', top: 20, left: 20, right: 20, bottom: 20, border: `1.5px solid ${C.secondary}55`, borderRadius: 6 }} />
           <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
             <Image src={assets.logoNaussWhite} style={{ width: 290, height: 104, objectFit: 'contain', alignSelf: 'center' }} />

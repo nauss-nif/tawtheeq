@@ -3,7 +3,8 @@ import path from 'path';
 import sharp from 'sharp';
 import { formatArabicDate } from '@/lib/utils';
 import type { MagazineData } from './data';
-import { sessionAccent, type SessionAccent } from './accents';
+import { GOLD, sessionAccent, sessionOrdinal, tabTopRatio, type SessionAccent } from './accents';
+import { STAR_PATH, STAR_VIEWBOX } from './brandStar';
 
 /**
  * مجلة الـFlipbook كملف HTML واحد قائم بذاته يعمل دون اتصال بالإنترنت:
@@ -14,7 +15,6 @@ import { sessionAccent, type SessionAccent } from './accents';
 const PRIMARY = '#0E5C50';
 const PRIMARY_DARK = '#0A4A40';
 const SECONDARY = '#B99C6B';
-const BACKGROUND = '#F6F2EA';
 const MUTED = '#8B8178';
 
 /** أصول مضمّنة: كل صورة تُخزَّن مرة واحدة وتُشار إليها بمفتاح (الشعارات تتكرر في كل صفحة) */
@@ -74,25 +74,52 @@ function img(key: string | null, cls: string, alt = ''): string {
   return key ? `<img data-k="${key}" class="${cls}" alt="${esc(alt)}">` : '';
 }
 
-function magPage(heading: string, courseTitle: string, pageNo: number, showMoi: boolean, body: string, accent?: SessionAccent): string {
-  // لون المحور يُمرَّر كمتغيرات CSS تلوّن الشريط الجانبي والترويسة والرقم والعناوين
-  const style = accent ? ` style="--ac:${accent.main};--act:${accent.tint}"` : '';
-  return `<div class="flip-page mag${accent ? ' accented' : ''}"${style}>
-<div class="side"></div>
-<div class="head"><div class="head-row"><span class="heading">${esc(heading)}</span><div class="logos">${img('logo', 'logo-sm')}${
-    showMoi ? `<span class="sep"></span>${img('moi', 'logo-sm')}` : ''
+type Side = 'right' | 'left';
+
+/** نجمة الجامعة: مُعرّفة مرة واحدة كـ symbol وتُستدعى في كل صفحة (لونها من CSS) */
+function star(cls: string): string {
+  return `<svg class="${cls}" viewBox="${STAR_VIEWBOX}" aria-hidden="true"><use href="#nauss-star"/></svg>`;
+}
+
+interface PageOpts {
+  heading: string;
+  courseTitle: string;
+  pageNo: number;
+  showMoi: boolean;
+  body: string;
+  side: Side;
+  accent?: SessionAccent;
+  /** رقم المحور (من الصفر) لإظهار لسان الفهرسة */
+  tab?: number;
+}
+
+function magPage(o: PageOpts): string {
+  const ac = o.accent ?? GOLD;
+  // متغيرات اللون على غلاف داخلي: page-flip يستبدل خاصية style لعناصر flip-page نفسها
+  const vars = `--ac:${ac.main};--acd:${ac.deep};--act:${ac.tint}`;
+  const tab = o.tab !== undefined && o.accent
+    ? `<div class="tab" style="top:${(tabTopRatio(o.tab) * 100).toFixed(1)}%"><b>${toArabic(o.tab + 1)}</b>${star('tab-star')}</div>`
+    : '';
+  return `<div class="flip-page mag"><div class="pg out-${o.side}${o.accent ? ' accented' : ''}${o.tab !== undefined ? ' has-tab' : ''}" style="${vars}">
+<div class="glow"></div>${star('bstar')}${tab}
+<div class="head"><div class="head-row"><span class="heading"><i></i><span>${esc(o.heading)}</span></span><div class="logos">${img('logo', 'logo-sm')}${
+    o.showMoi ? `<span class="sep"></span>${img('moi', 'logo-sm')}` : ''
   }</div></div><div class="rule"></div></div>
-<div class="content">${body}</div>
-<div class="foot"><span class="num">${toArabic(pageNo)}</span><span class="ct">${esc(courseTitle)}</span></div>
-</div>`;
+<div class="content">${o.body}</div>
+<div class="foot"><span class="num">${toArabic(o.pageNo)}</span><span class="ct">${esc(o.courseTitle)}</span></div>
+</div></div>`;
 }
 
 function imageBody(key: string | null, caption: string | null, sectionLabel?: string): string {
-  return `<div class="img-page">${
-    sectionLabel ? `<div class="section"><h2>${esc(sectionLabel)}</h2><div class="bar sm"></div></div>` : ''
-  }<div class="img-wrap"><div class="frame-img">${img(key, 'photo', caption ?? '')}</div></div>${
-    caption ? `<div class="caption"><div class="bar xs"></div><p>${esc(caption)}</p></div>` : ''
+  return `<div class="img-page${sectionLabel ? ' labeled' : ''}${caption ? ' captioned' : ''}">${
+    sectionLabel ? `<div class="section"><i></i><h2>${esc(sectionLabel)}</h2></div>` : ''
+  }<div class="img-wrap"><div class="aframe sm"><div class="frame-img">${img(key, 'photo', caption ?? '')}</div></div></div>${
+    caption ? `<div class="caption"><p>${esc(caption)}</p></div>` : ''
   }</div>`;
+}
+
+function ornament(): string {
+  return `<div class="orn"><span></span>${star('orn-star')}<span></span></div>`;
 }
 
 export async function buildOfflineHtml(data: MagazineData, slug: string): Promise<string> {
@@ -157,22 +184,29 @@ export async function buildOfflineHtml(data: MagazineData, slug: string): Promis
 
   const interior: string[] = [];
   let pageNo = 0;
+  // الصفحة الداخلية رقم k تقع يمين الصفحتين المتقابلتين إن كان ترتيبها في القراءة فرديًا (الغلاف = ٠)
+  const sideOf = (k: number): Side => ((k + 1) % 2 === 1 ? 'right' : 'left');
+  const page = (o: Omit<PageOpts, 'side' | 'courseTitle' | 'showMoi'>) =>
+    interior.push(magPage({ ...o, side: sideOf(interior.length), courseTitle: course.title, showMoi }));
 
   if (course.welcome_text) {
-    interior.push(
-      magPage(course.title, course.title, ++pageNo, showMoi,
-        `<div class="welcome"><div class="bar"></div><p>${esc(course.welcome_text)}</p><div class="bar"></div></div>`),
-    );
+    page({
+      heading: course.title,
+      pageNo: ++pageNo,
+      body: `<div class="welcome">${ornament()}<p>${esc(course.welcome_text)}</p>${ornament()}</div>`,
+    });
   }
 
-  interior.push(
-    magPage(course.title, course.title, ++pageNo, showMoi, `<div class="intro">
-<h2>عن الدورة</h2><div class="bar"></div>
+  page({
+    heading: course.title,
+    pageNo: ++pageNo,
+    body: `<div class="intro">
+<h2 class="stitle">عن الدورة</h2><div class="sbar"></div>
 ${course.description ? `<p class="desc">${esc(course.description)}</p>` : '<p class="muted">دورة تدريبية ضمن برامج الشراكات الدولية.</p>'}
 ${course.trainer_names.length > 0 ? `<div class="trainers"><h3>المدربون</h3><div class="chips">${course.trainer_names.map((n) => `<span>${esc(n)}</span>`).join('')}</div></div>` : ''}
 ${coordinator ? `<div class="coord">${img(avatarKey, 'avatar', coordinator.full_name)}<div><p class="lbl">إعداد المجلة</p><p class="name">${esc(coordinator.full_name)}</p><p class="lbl">${esc(coordinator.job_title || 'منسّق الدورة')}</p></div></div>` : ''}
-</div>`),
-  );
+</div>`,
+  });
 
   if (sessions.length > 0) {
     // رقم أول صفحة لكل محور: صفحة المحور + صفحة لكل صورة إضافية
@@ -183,11 +217,16 @@ ${coordinator ? `<div class="coord">${img(avatarKey, 'avatar', coordinator.full_
       return first;
     });
     const dense = sessions.length > 10;
-    interior.push(
-      magPage('المحتويات', course.title, ++pageNo, showMoi, `<div class="toc${dense ? ' dense' : ''}"><h2>المحتويات</h2><div class="bar"></div><ol>${sessions
-        .map((s, i) => `<li><span class="toc-n" style="background:${sessionAccent(i).main}">${toArabic(i + 1)}</span><span class="toc-t">${esc(s.title)}</span><span class="toc-dots"></span><span class="toc-p">${toArabic(starts[i])}</span></li>`)
-        .join('')}</ol></div>`),
-    );
+    page({
+      heading: 'المحتويات',
+      pageNo: ++pageNo,
+      body: `<div class="toc${dense ? ' dense' : ''}"><h2 class="stitle">المحتويات</h2><div class="sbar"></div><ol>${sessions
+        .map((s, i) => {
+          const a = sessionAccent(i);
+          return `<li><span class="toc-n" style="background:linear-gradient(135deg,${a.main},${a.deep})">${toArabic(i + 1)}</span><span class="toc-t" style="color:${a.deep}">${esc(s.title)}</span><span class="toc-dots" style="border-color:${a.main}66"></span><span class="toc-p">${toArabic(starts[i])}</span></li>`;
+        })
+        .join('')}</ol></div>`,
+    });
   }
 
   sessions.forEach((s, i) => {
@@ -195,36 +234,41 @@ ${coordinator ? `<div class="coord">${img(avatarKey, 'avatar', coordinator.full_
     const accent = sessionAccent(i);
     const main = sImgs[0];
     const mainKey = main ? imageKey.get(main.id) ?? null : null;
-    interior.push(
-      magPage(s.title, course.title, ++pageNo, showMoi, `<div class="session${mainKey ? ' has-img' : ''}">
+    page({
+      heading: s.title,
+      pageNo: ++pageNo,
+      accent,
+      tab: i,
+      body: `<span class="bignum" aria-hidden="true">${toArabic(i + 1)}</span><div class="session${mainKey ? ' has-img' : ''}">
 <div class="s-text">
-<span class="pill">الجلسة ${toArabic(i + 1)}</span>
-<h2>${esc(s.title)}</h2><div class="bar"></div>
+<span class="kick"><i></i>الجلسة ${esc(sessionOrdinal(i))}</span>
+<h2>${esc(s.title)}</h2><div class="gbar"></div>
 ${s.presenter || s.time_label ? `<div class="s-meta">${s.presenter ? `<span>المقدّم: ${esc(s.presenter)}</span>` : ''}${s.time_label ? `<span dir="ltr">${esc(s.time_label)}</span>` : ''}</div>` : ''}
 ${s.description ? `<p class="desc">${esc(s.description)}</p>` : '<p class="desc muted">جلسة ضمن برنامج الدورة التدريبية.</p>'}
 </div>
-${mainKey ? `<div class="s-img"><div class="frame-img">${img(mainKey, 'photo', main!.caption ?? s.title)}</div></div>` : ''}
-</div>`, accent),
-    );
+${mainKey ? `<div class="s-img"><div class="aframe"><div class="frame-img">${img(mainKey, 'photo', main!.caption ?? s.title)}</div></div></div>` : ''}
+</div>`,
+    });
     sImgs.slice(1).forEach((m) => {
-      interior.push(magPage(s.title, course.title, ++pageNo, showMoi, imageBody(imageKey.get(m.id) ?? null, m.caption, s.title), accent));
+      page({ heading: s.title, pageNo: ++pageNo, accent, tab: i, body: imageBody(imageKey.get(m.id) ?? null, m.caption, s.title) });
     });
   });
 
   unassigned.forEach((m, idx) => {
-    interior.push(
-      magPage('صور من الدورة', course.title, ++pageNo, showMoi,
-        imageBody(imageKey.get(m.id) ?? null, m.caption, idx === 0 ? 'صور من الدورة' : undefined)),
-    );
+    page({
+      heading: 'صور من الدورة',
+      pageNo: ++pageNo,
+      body: imageBody(imageKey.get(m.id) ?? null, m.caption, idx === 0 ? 'صور من الدورة' : undefined),
+    });
   });
 
   if ((interior.length + 2) % 2 !== 0) {
-    interior.push('<div class="flip-page mag"><div class="side"></div></div>');
+    interior.push(`<div class="flip-page mag"><div class="pg out-left" style="--ac:${GOLD.main};--acd:${GOLD.deep};--act:${GOLD.tint}">${star('bstar')}</div></div>`);
   }
 
   const coverPage = `<div class="flip-page cover" data-density="hard">
 ${img(coverKey, 'cover-bg')}
-<div class="cover-shade"></div><div class="frame"></div>
+<div class="cover-shade"></div><div class="frame"></div>${star('cover-star')}
 <div class="cover-logos">${img('logoW', 'logo-lg', 'جامعة نايف')}${showMoi ? `<span class="sep"></span>${img('moiW', 'logo-lg', 'وزارة الداخلية')}` : ''}</div>
 <div class="cover-text">
 <div class="bar wide"></div>
@@ -236,7 +280,7 @@ ${img(coverKey, 'cover-bg')}
 </div>`;
 
   const backPage = `<div class="flip-page back" data-density="hard">
-<div class="frame dim"></div>
+<div class="frame dim"></div>${star('back-star')}
 <div class="back-logo">${img('logoW', 'logo-xl', 'جامعة نايف العربية للعلوم الأمنية')}</div>
 <div class="back-text"><div class="bar"></div><p class="b1">إدارة عمليات التدريب</p><p class="b2">وكالة الجامعة للتدريب</p><p class="b3">جامعة نايف العربية للعلوم الأمنية</p></div>
 </div>`;
@@ -288,72 +332,103 @@ body{font-family:'Cairo',system-ui,sans-serif;background:#0a3d35;color:#2a302d;o
 .back-text .bar{margin:0 auto 12px}
 .b1{font-size:16px;font-weight:600}.b2{font-size:14px;color:rgba(255,255,255,.8)}.b3{font-size:14px;color:rgba(255,255,255,.7)}
 /* الصفحة الداخلية */
-.mag{background-color:${BACKGROUND};background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120' viewBox='0 0 120 120'%3E%3Cpath d='M60 24 L64 56 L96 60 L64 64 L60 96 L56 64 L24 60 L56 56 Z' fill='%23B99C6B' fill-opacity='0.05'/%3E%3C/svg%3E");background-size:120px 120px}
-.side{position:absolute;top:0;bottom:0;right:0;width:6px;background:linear-gradient(to bottom,${PRIMARY},${PRIMARY_DARK})}
-.head{position:absolute;inset-inline:0;top:0;padding:16px 24px 0}
+.mag{background:#F7F3EC}
+.pg{position:absolute;inset:0;overflow:hidden}
+.glow{position:absolute;inset:0;background:radial-gradient(90% 70% at 100% 100%,var(--act) 0%,transparent 60%)}
+.out-left .glow{background:radial-gradient(90% 70% at 0% 100%,var(--act) 0%,transparent 60%)}
+.bstar{position:absolute;width:430px;height:433px;bottom:-140px;right:-140px;fill:var(--ac);opacity:.14;pointer-events:none}
+.out-left .bstar{right:auto;left:-140px}
+.accented .bstar{opacity:.1}
+.tab{position:absolute;right:0;width:34px;height:74px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#fff;background:linear-gradient(180deg,var(--ac),var(--acd));border-radius:12px 0 0 12px;box-shadow:0 4px 6px -1px rgba(0,0,0,.12)}
+.out-left .tab{right:auto;left:0;border-radius:0 12px 12px 0}
+.tab b{font-size:17px;font-weight:700;line-height:1}
+.tab-star{width:12px;height:12px;fill:#fff;opacity:.8}
+.head{position:absolute;inset-inline:0;top:0;padding:16px 28px 0}
 .head-row{display:flex;align-items:center;justify-content:space-between}
-.heading{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding-left:12px;font-size:12px;font-weight:600;color:${PRIMARY}}
+.heading{display:flex;min-width:0;align-items:center;gap:8px;padding-left:12px;font-size:12px;font-weight:600;color:${PRIMARY}}
+.accented .heading{color:var(--ac)}
+.heading i{width:6px;height:6px;flex-shrink:0;border-radius:9999px;background:var(--ac)}
+.heading span{overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .logos{display:flex;flex-shrink:0;align-items:center;gap:10px}
 .logo-sm{height:28px;object-fit:contain}
 .logos .sep{height:24px;width:1px;background:rgba(185,156,107,.4)}
-.rule{margin-top:8px;height:1px;background:linear-gradient(to left,transparent,${SECONDARY},transparent);opacity:.6}
-.content{position:absolute;inset-inline:0;top:64px;bottom:48px;overflow:hidden;padding:0 28px}
-.foot{position:absolute;left:24px;right:24px;bottom:12px;display:flex;align-items:center;justify-content:space-between;border-top:1px solid rgba(185,156,107,.25);padding-top:8px}
-.num{display:flex;width:24px;height:24px;align-items:center;justify-content:center;border-radius:9999px;background:${PRIMARY};font-size:10px;font-weight:700;color:#fff}
-.ct{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;padding-right:12px;font-size:10px;letter-spacing:.025em;color:${MUTED}}
+.rule{margin-top:8px;height:1px;background:linear-gradient(to left,var(--ac),transparent);opacity:.55}
+.out-left .rule{background:linear-gradient(to right,var(--ac),transparent)}
+.content{position:absolute;top:64px;bottom:48px;left:30px;right:30px;overflow:hidden}
+.has-tab.out-right .content{right:52px}
+.has-tab.out-left .content{left:52px}
+.foot{position:absolute;left:24px;right:24px;bottom:12px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-top:1px solid color-mix(in srgb,var(--ac) 20%,transparent);padding-top:8px}
+.out-left .foot{flex-direction:row-reverse}
+.num{display:flex;width:24px;height:24px;flex-shrink:0;align-items:center;justify-content:center;border-radius:9999px;background:linear-gradient(135deg,var(--ac),var(--acd));font-size:10px;font-weight:700;color:#fff}
+.ct{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:10px;letter-spacing:.025em;color:${MUTED}}
 .desc{white-space:pre-line;font-size:13.5px;line-height:1.625;color:#2a302d}
-.welcome{display:flex;height:100%;flex-direction:column;align-items:center;justify-content:center;padding:0 24px;text-align:center}
-.welcome p{max-width:85%;margin:24px 0;font-size:15px;font-weight:500;line-height:2;color:${PRIMARY}}
+.stitle{font-size:21px;font-weight:600;color:${PRIMARY}}
+.sbar{height:3px;width:56px;border-radius:9999px;margin:8px 0 12px;background:linear-gradient(to left,var(--ac),var(--act))}
+.orn{display:flex;align-items:center;gap:12px}
+.orn span{height:1px;width:56px;background:linear-gradient(to left,${SECONDARY},transparent)}
+.orn span:last-child{background:linear-gradient(to right,${SECONDARY},transparent)}
+.orn-star{width:20px;height:20px;fill:${SECONDARY}}
+.welcome{display:flex;height:100%;flex-direction:column;align-items:center;justify-content:center;padding:0 32px;text-align:center}
+.welcome p{max-width:85%;margin:24px 0;font-size:16px;font-weight:500;line-height:2.1;color:${PRIMARY}}
 .intro{display:flex;height:100%;flex-direction:column;justify-content:center}
-.intro h2{font-size:20px;font-weight:600;color:${PRIMARY}}
-.intro>.bar{margin:8px 0 12px}
 .trainers{margin-top:20px}
 .trainers h3{margin-bottom:8px;font-size:16px;font-weight:600;color:${PRIMARY}}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
-.chips span{border-radius:8px;border:1px solid rgba(185,156,107,.4);background:rgba(255,255,255,.7);padding:4px 12px;font-size:13px;color:${PRIMARY}}
-.coord{margin-top:20px;display:flex;align-items:center;gap:12px;border-radius:12px;border:1px solid rgba(185,156,107,.3);background:rgba(255,255,255,.6);padding:12px}
+.chips span{border-radius:8px;border:1px solid rgba(185,156,107,.4);background:rgba(255,255,255,.8);padding:4px 12px;font-size:13px;color:${PRIMARY};box-shadow:0 1px 2px rgba(0,0,0,.05)}
+.coord{margin-top:20px;display:flex;align-items:center;gap:12px;border-radius:12px;border:1px solid rgba(185,156,107,.3);background:rgba(255,255,255,.7);padding:12px;box-shadow:0 1px 2px rgba(0,0,0,.05)}
 .avatar{width:48px;height:48px;flex-shrink:0;border-radius:9999px;border:1px solid rgba(185,156,107,.5);object-fit:cover}
 .coord .lbl{font-size:11px;color:${MUTED}}.coord .name{font-size:13.5px;font-weight:600;color:${PRIMARY}}
-.session{display:flex;height:100%;gap:20px}
+/* صفحة المحور */
+.bignum{position:absolute;top:0;right:-4px;font-size:170px;font-weight:700;line-height:1;color:var(--act);pointer-events:none;user-select:none}
+.session{position:relative;display:flex;height:100%;gap:24px}
 .s-text{display:flex;width:100%;flex-direction:column;justify-content:center}
 .session.has-img .s-text{width:44%;flex-shrink:0}
-.pill{margin-bottom:8px;width:fit-content;border-radius:9999px;background:rgba(185,156,107,.15);padding:4px 12px;font-size:11px;font-weight:700;color:${SECONDARY}}
-.s-text h2{font-size:19px;font-weight:600;line-height:1.375;color:${PRIMARY}}
-.s-text>.bar{width:48px;margin:8px 0 12px}
+.kick{margin-bottom:8px;display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;letter-spacing:.025em;color:var(--ac)}
+.kick i{height:3px;width:24px;border-radius:9999px;background:var(--ac)}
+.s-text h2{font-size:22px;font-weight:600;line-height:1.375;color:var(--acd)}
+.s-text .gbar{height:3px;width:56px;border-radius:9999px;margin:10px 0 12px;background:linear-gradient(to left,var(--ac),${SECONDARY})}
 .s-text .desc{font-size:13px}
 .s-meta{margin-bottom:12px;display:flex;flex-wrap:wrap;gap:4px 16px;font-size:12px;color:${MUTED}}
 .s-img{display:flex;flex:1;min-width:0;min-height:0;align-items:center;justify-content:center}
-.frame-img{display:flex;max-height:100%;max-width:100%;align-items:center;justify-content:center;overflow:hidden;border-radius:12px;border:1px solid rgba(185,156,107,.4);background:#fff;padding:6px;box-shadow:0 4px 6px -1px rgba(0,0,0,.1),0 2px 4px -2px rgba(0,0,0,.1)}
-.photo{max-height:100%;max-width:100%;width:auto;border-radius:8px;object-fit:contain}
-.s-img .photo{max-height:calc(560px - 112px - 12px)}
+/* إطار الصورة فوق كتلة بلون المحور مزاحة نحو الحافة الخارجية */
+.aframe{position:relative;max-width:100%}
+.aframe::before{content:"";position:absolute;inset:0;border-radius:12px;background:linear-gradient(135deg,var(--ac),var(--acd));transform:translate(12px,12px)}
+.out-left .aframe::before{transform:translate(-12px,12px)}
+.aframe.sm::before{transform:translate(8px,8px)}
+.out-left .aframe.sm::before{transform:translate(-8px,8px)}
+.frame-img{position:relative;overflow:hidden;border-radius:12px;background:#fff;padding:6px;box-shadow:0 10px 15px -3px rgba(0,0,0,.12),0 4px 6px -4px rgba(0,0,0,.1)}
+.photo{display:block;width:auto;max-width:100%;border-radius:8px;object-fit:contain}
+.s-img .photo{max-height:400px}
 .portrait .session{flex-direction:column;justify-content:center}
 .portrait .session.has-img .s-text{width:100%}
-.portrait .s-img .photo{max-height:340px}
+.portrait .s-img .photo{max-height:320px}
+.portrait .bignum{top:-10px}
 .img-page{display:flex;height:100%;flex-direction:column}
-.section{margin-bottom:8px;flex-shrink:0}
-.section h2{font-size:18px;font-weight:600;color:${PRIMARY}}
-.img-wrap{display:flex;min-height:0;flex:1;align-items:center;justify-content:center}
-.img-wrap .frame-img{height:100%}
-.img-wrap .photo{height:100%}
-.caption{margin-top:8px;flex-shrink:0;text-align:center}
+.section{margin-bottom:12px;display:flex;flex-shrink:0;align-items:center;gap:8px}
+.section i{height:3px;width:24px;flex-shrink:0;border-radius:9999px;background:var(--ac)}
+.section h2{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:16px;font-weight:600;color:var(--acd)}
+.img-wrap{display:flex;min-height:0;flex:1;align-items:center;justify-content:center;padding-bottom:12px}
+.img-page .photo{max-height:420px}
+.img-page.labeled .photo{max-height:380px}
+.img-page.captioned .photo{max-height:390px}
+.img-page.labeled.captioned .photo{max-height:350px}
+.portrait .img-page .photo{max-height:640px}
+.portrait .img-page.labeled .photo{max-height:600px}
+.caption{flex-shrink:0;text-align:center}
 .caption p{font-size:13px;font-weight:500;color:${PRIMARY}}
-/* لون المحور */
-.accented .side{background:var(--ac)}
-.accented .heading,.accented .s-text h2,.accented .section h2{color:var(--ac)}
-.accented .num,.accented .s-text>.bar,.accented .section .bar{background:var(--ac)}
-.accented .pill{background:var(--act);color:var(--ac)}
 /* المحتويات */
 .toc{display:flex;height:100%;flex-direction:column;justify-content:center}
-.toc h2{font-size:20px;font-weight:600;color:${PRIMARY}}
-.toc>.bar{margin:8px 0 12px}
 .toc ol{list-style:none}
 .toc li{display:flex;align-items:center;gap:12px;margin-bottom:8px;font-size:13.5px}
 .toc.dense li{margin-bottom:4px;font-size:12px}
-.toc-n{display:flex;width:24px;height:24px;flex-shrink:0;align-items:center;justify-content:center;border-radius:9999px;font-size:11px;font-weight:700;color:#fff}
-.toc.dense .toc-n{width:20px;height:20px;font-size:10px}
-.toc-t{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:500;color:#2a302d}
-.toc-dots{flex:1;min-width:24px;border-bottom:1px dotted rgba(185,156,107,.6)}
+.toc-n{display:flex;width:32px;height:24px;flex-shrink:0;align-items:center;justify-content:center;border-radius:8px 2px 2px 8px;font-size:11px;font-weight:700;color:#fff;box-shadow:0 1px 2px rgba(0,0,0,.08)}
+.toc.dense .toc-n{width:28px;height:20px;font-size:10px}
+.toc-t{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-weight:500}
+.toc-dots{flex:1;min-width:24px;border-bottom:1px dotted}
 .toc-p{flex-shrink:0;color:${MUTED};font-variant-numeric:tabular-nums}
+/* نجمة كبيرة على الغلافين */
+.cover-star{position:absolute;width:520px;height:523px;top:-170px;left:-170px;fill:#fff;opacity:.1;pointer-events:none}
+.back-star{position:absolute;width:560px;height:563px;bottom:-190px;right:-190px;fill:${SECONDARY};opacity:.16;pointer-events:none}
 /* شريط التحكم */
 .controls{margin-top:12px;display:flex;align-items:center;gap:16px;color:rgba(255,255,255,.85)}
 .btn{display:inline-flex;width:40px;height:40px;align-items:center;justify-content:center;border:0;border-radius:9999px;background:rgba(255,255,255,.15);color:#fff;cursor:pointer;transition:background .15s}
@@ -367,6 +442,7 @@ body{font-family:'Cairo',system-ui,sans-serif;background:#0a3d35;color:#2a302d;o
 </style>
 </head>
 <body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="nauss-star" viewBox="${STAR_VIEWBOX}"><path fill-rule="evenodd" d="${STAR_PATH}"/></symbol></svg>
 <div class="stage" id="root">
 <button class="fs" id="fs" type="button">ملء الشاشة</button>
 <div class="holder" id="holder"><div class="scaler" id="scaler"></div></div>
