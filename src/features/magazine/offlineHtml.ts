@@ -149,7 +149,11 @@ export async function buildOfflineHtml(data: MagazineData, slug: string): Promis
 
   // الصور: نحوّل كل صورة مرة واحدة، والغلاف يعيد استخدام صورة المعرض إن كان منها
   const imageKey = new Map<string, string>();
-  const converted = await mapLimit(images, 6, (m) => remoteJpeg(m.processed_url ?? m.thumbnail_url ?? '', 1400));
+  // مع إعادة محاولة واحدة حتى لا تسقط صورة بسبب خطأ شبكة عابر
+  const converted = await mapLimit(images, 6, async (m) => {
+    const url = m.processed_url ?? m.thumbnail_url ?? '';
+    return (await remoteJpeg(url, 1400)) ?? (await remoteJpeg(url, 1400));
+  });
   images.forEach((m, i) => {
     const src = converted[i];
     if (!src) return;

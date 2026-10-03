@@ -130,16 +130,29 @@ async function buildAssets(data: MagazineData): Promise<PdfAssets> {
   // نحوّل الصور (لتفادي ملفات ضخمة نكتفي بحدٍّ معقول): قصّ ذكي + تحسين احترافي
   // حدّ أعلى معقول لحجم الملف ووقت المعالجة (كان ٤٠ فتسقط صور المجلات الأكبر من الـPDF)
   const gallery = data.images.slice(0, 80);
-  const images = (
-    await Promise.all(
-      gallery.map(async (m) => {
-        const url = m.processed_url ?? m.thumbnail_url ?? '';
-        const aspect = aspectById.get(m.id);
-        const r = aspect ? await toSmartJpeg(url, aspect) : await toJpegSized(url, 1200);
-        return r ? { id: m.id, src: r.src, caption: m.caption, sessionId: m.session_id, w: r.w, h: r.h, width: m.width, height: m.height } : null;
-      }),
-    )
-  ).filter(
+  // ٦ صور في كل مرة مع إعادة محاولة: معالجة كل الصور دفعة واحدة كانت تُرهق دالة الخادم
+  // فتفشل بعض الصور بصمت وتسقط من الـPDF
+  const convert = async (m: (typeof gallery)[number]) => {
+    const url = m.processed_url ?? m.thumbnail_url ?? '';
+    const aspect = aspectById.get(m.id);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const r = aspect ? await toSmartJpeg(url, aspect) : await toJpegSized(url, 1200);
+      if (r) return { id: m.id, src: r.src, caption: m.caption, sessionId: m.session_id, w: r.w, h: r.h, width: m.width, height: m.height };
+    }
+    console.warn('[pdf] image dropped after retry:', m.id);
+    return null;
+  };
+  const converted = new Array<Awaited<ReturnType<typeof convert>>>(gallery.length);
+  let next = 0;
+  await Promise.all(
+    Array.from({ length: Math.min(6, gallery.length) }, async () => {
+      while (next < gallery.length) {
+        const i = next++;
+        converted[i] = await convert(gallery[i]);
+      }
+    }),
+  );
+  const images = converted.filter(
     (x): x is NonNullable<typeof x> => x !== null,
   );
 
