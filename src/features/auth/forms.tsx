@@ -3,14 +3,16 @@
 import { useEffect } from 'react';
 import { useFormState, useFormStatus } from 'react-dom';
 import { toast } from 'sonner';
-import { Input } from '@/components/ui/Input';
+import { Mail, Lock, User, Phone, LogIn } from 'lucide-react';
+import { Input, PasswordInput } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { loginAction, registerAction, resetPasswordAction, type ActionState } from './actions';
 
-function SubmitButton({ children }: { children: React.ReactNode }) {
+function SubmitButton({ children, icon }: { children: React.ReactNode; icon?: React.ReactNode }) {
   const { pending } = useFormStatus();
   return (
-    <Button type="submit" loading={pending} className="w-full">
+    <Button type="submit" loading={pending} size="lg" className="mt-2 w-full">
+      {!pending && icon}
       {children}
     </Button>
   );
@@ -29,9 +31,9 @@ export function LoginForm() {
   useToastFeedback(state);
   return (
     <form action={action} className="flex flex-col gap-4">
-      <Input id="email" name="email" type="email" label="البريد الإلكتروني" dir="ltr" placeholder="name@nauss.edu.sa" required />
-      <Input id="password" name="password" type="password" label="كلمة المرور" required />
-      <SubmitButton>تسجيل الدخول</SubmitButton>
+      <Input id="email" name="email" type="email" label="البريد الإلكتروني" dir="ltr" placeholder="name@nauss.edu.sa" autoComplete="email" icon={<Mail />} required />
+      <PasswordInput id="password" name="password" label="كلمة المرور" autoComplete="current-password" icon={<Lock />} required />
+      <SubmitButton icon={<LogIn className="size-5" />}>تسجيل الدخول</SubmitButton>
     </form>
   );
 }
@@ -41,11 +43,11 @@ export function RegisterForm() {
   useToastFeedback(state);
   return (
     <form action={action} className="flex flex-col gap-4">
-      <Input id="full_name" name="full_name" label="الاسم الكامل" required />
-      <Input id="email" name="email" type="email" label="البريد الإلكتروني" dir="ltr" placeholder="name@nauss.edu.sa" required />
-      <Input id="phone" name="phone" type="tel" label="رقم الجوال" dir="ltr" placeholder="05xxxxxxxx" required />
-      <Input id="password" name="password" type="password" label="كلمة المرور" hint="8 أحرف على الأقل" required />
-      <Input id="confirm" name="confirm" type="password" label="تأكيد كلمة المرور" required />
+      <Input id="full_name" name="full_name" label="الاسم الكامل" autoComplete="name" icon={<User />} required />
+      <Input id="email" name="email" type="email" label="البريد الإلكتروني" dir="ltr" placeholder="name@nauss.edu.sa" autoComplete="email" icon={<Mail />} required />
+      <Input id="phone" name="phone" type="tel" label="رقم الجوال" dir="ltr" placeholder="05xxxxxxxx" autoComplete="tel" icon={<Phone />} required />
+      <PasswordInput id="password" name="password" label="كلمة المرور" hint="8 أحرف على الأقل" autoComplete="new-password" icon={<Lock />} required />
+      <PasswordInput id="confirm" name="confirm" label="تأكيد كلمة المرور" autoComplete="new-password" icon={<Lock />} required />
       <SubmitButton>إنشاء الحساب</SubmitButton>
     </form>
   );
@@ -56,7 +58,7 @@ export function ResetForm() {
   useToastFeedback(state);
   return (
     <form action={action} className="flex flex-col gap-4">
-      <Input id="email" name="email" type="email" label="البريد الإلكتروني" dir="ltr" required />
+      <Input id="email" name="email" type="email" label="البريد الإلكتروني" dir="ltr" placeholder="name@nauss.edu.sa" autoComplete="email" icon={<Mail />} required />
       <SubmitButton>إرسال رابط إعادة التعيين</SubmitButton>
     </form>
   );

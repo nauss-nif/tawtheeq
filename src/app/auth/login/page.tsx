@@ -7,12 +7,13 @@ export default function LoginPage() {
   return (
     <AuthCard
       title="تسجيل الدخول"
-      subtitle="ادخل إلى لوحة التحكم لإدارة دوراتك ومجلاتك."
+      subtitle="أهلًا بك في منصة توثيق. ادخل لإدارة دوراتك ومجلاتها."
       footer={
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-2">
           <span>
             ليس لديك حساب؟ <AuthLink href="/auth/register">سجّل الآن</AuthLink>
           </span>
+          <span className="text-muted/40">|</span>
           <AuthLink href="/auth/reset">نسيت كلمة المرور؟</AuthLink>
         </div>
       }

@@ -9,6 +9,7 @@ import {
   Users,
   BarChart3,
   Library,
+  PlusCircle,
   Menu,
   X,
 } from 'lucide-react';
@@ -26,6 +27,7 @@ const icons = {
   users: Users,
   stats: BarChart3,
   library: Library,
+  new: PlusCircle,
 };
 
 /**
@@ -36,8 +38,12 @@ export function Sidebar({ items }: { items: NavItem[] }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(true);
 
-  const isActive = (href: string) =>
-    pathname === href || (href !== '/dashboard' && href !== '/admin' && pathname.startsWith(href));
+  // العنصر النشط = أطول رابط يطابق بداية المسار (فلا تُضاء «دوراتي» داخل «دورة جديدة»)
+  const activeHref = items
+    .map((i) => i.href)
+    .filter((h) => pathname === h || pathname.startsWith(`${h}/`))
+    .sort((a, b) => b.length - a.length)[0];
+  const isActive = (href: string) => href === activeHref;
 
   return (
     <>
@@ -52,8 +58,8 @@ export function Sidebar({ items }: { items: NavItem[] }) {
           {open && (
             <div className="flex flex-col gap-2">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src="/logo-nauss.png" alt="جامعة نايف العربية للعلوم الأمنية" className="h-9 w-auto object-contain" />
-              <span className="text-sm font-semibold text-primary">منصة توثيق</span>
+              <img src="/logo-nauss-deep.png" alt="جامعة نايف العربية للعلوم الأمنية" className="h-14 w-auto object-contain" />
+              <span className="text-sm font-semibold text-primary">منصة توثيق الدورات</span>
             </div>
           )}
           <button
