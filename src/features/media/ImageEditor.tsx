@@ -286,6 +286,7 @@ export function ImageEditor({
     setBrightness(1);
     setContrast(1);
     setSaturation(1);
+    toast.info('أُعيدت الصورة لأصلها كما رُفعت — اضغط «حفظ التعديل» لاعتماد ذلك');
   };
 
   const save = async () => {
@@ -478,7 +479,7 @@ export function ImageEditor({
             onClick={reset}
             className="inline-flex items-center gap-1.5 rounded-xl bg-muted/10 px-3 py-1.5 text-xs text-primary hover:bg-muted/20"
           >
-            <RefreshCw className="size-3.5" /> إعادة ضبط
+            <RefreshCw className="size-3.5" /> إعادة الصورة الأصلية
           </button>
         </div>
 

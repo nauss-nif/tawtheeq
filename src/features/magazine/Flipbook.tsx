@@ -1,20 +1,37 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { X, ChevronRight, ChevronLeft, Download } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft } from 'lucide-react';
 import type { PageFlip as PageFlipInstance } from 'page-flip';
 import { formatArabicDate } from '@/lib/utils';
 import type { MagazineData } from './data';
 import { GOLD, sessionAccent, sessionOrdinal, tabTopRatio, type SessionAccent } from './accents';
 import { STAR_H, STAR_PATH, STAR_VIEWBOX, STAR_W } from './brandStar';
 import { packImagePages, sessionPageCount, type ImageSlot } from './imageLayout';
+import { DownloadButtons } from './DownloadButtons';
+import { MagazineStories } from './MagazineStories';
 
 /**
+ * المجلة الإلكترونية: على الجوال عارض «القصص» (MagazineStories)، وعلى الشاشات الكبيرة
  * وضع Flipbook: مجلة أفقية أنيقة. صورة واحدة كبيرة لكل صفحة (تناسب الصور الأفقية)،
  * شعارات شفافة في الترويسة، معلم المدينة كخلفية شفافة على كل الصفحات،
  * ترقيم ثابت أسفل الصفحة، وغلاف خلفي مرتّب. الشعارات قابلة للتحكم (الشراكات).
  */
 export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () => void }) {
+  // الجوال: عارض «القصص» العمودي؛ الشاشات الكبيرة: المجلة المتقلبة بصفحتين متقابلتين
+  const [mobile, setMobile] = useState<boolean | null>(null);
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const update = () => setMobile(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  if (mobile === null) return <div className="fixed inset-0 z-[70] bg-[#0a3d35]" />;
+  return mobile ? <MagazineStories data={data} onClose={onClose} /> : <FlipbookSpread data={data} onClose={onClose} />;
+}
+
+function FlipbookSpread({ data, onClose }: { data: MagazineData; onClose: () => void }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const { course, cover, images, sessions, coordinator, landmarkUrl } = data;
   const coverBg = cover?.processed_url ?? landmarkUrl ?? null;
@@ -288,15 +305,7 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
       >
         <X className="size-5" /> إغلاق
       </button>
-      {course.magazine_slug && (
-        <a
-          href={`/m/${course.magazine_slug}/offline`}
-          title="ملف HTML واحد يفتح على أي جهاز دون اتصال بالإنترنت"
-          className="absolute left-3 top-3 z-10 inline-flex items-center gap-2 rounded-2xl bg-white/15 px-4 py-2 text-sm text-white hover:bg-white/25"
-        >
-          <Download className="size-5" /> تنزيل للعرض دون اتصال
-        </a>
-      )}
+      {course.magazine_slug && <DownloadButtons slug={course.magazine_slug} className="absolute left-3 top-3 z-10" />}
 
       {/* غلاف يحجز المساحة المُصغّرة، والداخل بمقاس التصميم مع تصغير بتناسب واحد */}
       <div style={{ width: PAGE_W * (singlePage ? 1 : 2) * scale, height: PAGE_H * scale }} className="relative">

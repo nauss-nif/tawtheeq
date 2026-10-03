@@ -93,9 +93,23 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
   }
 
+  // إعادة الضبط: كل القيم افتراضية ← نسترجع نسخة الأصل كما هي بايتًا ببايت (الصورة كما خرجت عند الرفع)
+  // بدل تمريرها في المعالجة مجددًا فتُضاف عليها حدّة وضغط
+  const near1 = (v: number | undefined) => v === undefined || Math.abs(v - 1) < 0.005;
+  const isRestore =
+    !edit.crop && !(edit.rotate && edit.rotate % 360) && (!edit.filter || edit.filter === 'none') &&
+    near1(edit.brightness) && near1(edit.contrast) && near1(edit.saturation);
+
   let out;
   try {
-    out = await reprocessImage(source, edit);
+    if (isRestore) {
+      const resized = (w: number, q: number) =>
+        sharp(source, { failOn: 'none' }).resize({ width: w, height: w, fit: 'inside', withoutEnlargement: true }).webp({ quality: q }).toBuffer();
+      const [large, thumb] = await Promise.all([resized(1200, 78), resized(480, 72)]);
+      out = { full: source, large, thumb, fullSize: source.length };
+    } else {
+      out = await reprocessImage(source, edit);
+    }
   } catch (e) {
     console.error('[media/edit] reprocess failed:', e);
     return NextResponse.json({ error: 'تعذّرت معالجة الصورة' }, { status: 500 });
@@ -124,7 +138,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
   // إعدادات المحرّر كما هي (كائن صغير) ليُفتح عليها المحرّر لاحقًا
   const edit_params =
-    editorState && typeof editorState === 'object' && JSON.stringify(editorState).length < 4000
+    !isRestore && editorState && typeof editorState === 'object' && JSON.stringify(editorState).length < 4000
       ? (editorState as Record<string, unknown>)
       : null;
 

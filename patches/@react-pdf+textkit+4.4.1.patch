@@ -1,5 +1,5 @@
 diff --git a/node_modules/@react-pdf/textkit/lib/textkit.cjs b/node_modules/@react-pdf/textkit/lib/textkit.cjs
-index 7879740..3adf99b 100644
+index 7879740..54ee4a0 100644
 --- a/node_modules/@react-pdf/textkit/lib/textkit.cjs
 +++ b/node_modules/@react-pdf/textkit/lib/textkit.cjs
 @@ -1078,6 +1078,13 @@ var getItemAtIndex = function getItemAtIndex(runs, objectName, index) {
@@ -16,11 +16,13 @@ index 7879740..3adf99b 100644
  var reorderLine = function reorderLine(attributedString) {
    var _attributedString$run;
    var levels = getBidiLevels$1(attributedString.runs);
-@@ -1107,11 +1114,14 @@ var reorderLine = function reorderLine(attributedString) {
+@@ -1107,11 +1114,16 @@ var reorderLine = function reorderLine(attributedString) {
      for (var i = 0; i < selectedIndices.length; i += 1) {
        var index = selectedIndices[i];
        var glyph = getItemAtIndex(attributedString.runs, 'glyphs', index);
 -      if (addedGlyphs.has(glyph.id)) continue;
++      // حماية: موضع بلا رسم مقابل (نص مختلط الاتجاه في بعض البيئات) يُتخطّى بدل إسقاط الـPDF كله
++      if (!glyph) continue;
 +      // مفتاح موضع الرسم داخل السطر لا رقمه: fontkit يعيد الكائن نفسه لكل تكرار للرسم،
 +      // فالمقارنة بالرقم/الكائن كانت تُسقط ligature «لا» الثانية في السطر
 +      var glyphKey = getGlyphKeyAtIndex(attributedString.runs, index);
@@ -34,7 +36,7 @@ index 7879740..3adf99b 100644
      }
      return _extends__default.default({}, run, {
 diff --git a/node_modules/@react-pdf/textkit/lib/textkit.js b/node_modules/@react-pdf/textkit/lib/textkit.js
-index 9c407c8..951d280 100644
+index 9c407c8..0f1c994 100644
 --- a/node_modules/@react-pdf/textkit/lib/textkit.js
 +++ b/node_modules/@react-pdf/textkit/lib/textkit.js
 @@ -1064,6 +1064,13 @@ var getItemAtIndex = function getItemAtIndex(runs, objectName, index) {
@@ -51,11 +53,13 @@ index 9c407c8..951d280 100644
  var reorderLine = function reorderLine(attributedString) {
    var _attributedString$run;
    var levels = getBidiLevels$1(attributedString.runs);
-@@ -1093,11 +1100,14 @@ var reorderLine = function reorderLine(attributedString) {
+@@ -1093,11 +1100,16 @@ var reorderLine = function reorderLine(attributedString) {
      for (var i = 0; i < selectedIndices.length; i += 1) {
        var index = selectedIndices[i];
        var glyph = getItemAtIndex(attributedString.runs, 'glyphs', index);
 -      if (addedGlyphs.has(glyph.id)) continue;
++      // حماية: موضع بلا رسم مقابل (نص مختلط الاتجاه في بعض البيئات) يُتخطّى بدل إسقاط الـPDF كله
++      if (!glyph) continue;
 +      // مفتاح موضع الرسم داخل السطر لا رقمه: fontkit يعيد الكائن نفسه لكل تكرار للرسم،
 +      // فالمقارنة بالرقم/الكائن كانت تُسقط ligature «لا» الثانية في السطر
 +      var glyphKey = getGlyphKeyAtIndex(attributedString.runs, index);

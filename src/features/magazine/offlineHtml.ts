@@ -2,10 +2,11 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import sharp from 'sharp';
 import { formatArabicDate } from '@/lib/utils';
+import { formatDateRange } from '@/lib/text';
 import type { MagazineData } from './data';
 import { GOLD, sessionAccent, sessionOrdinal, tabTopRatio, type SessionAccent } from './accents';
 import { STAR_PATH, STAR_VIEWBOX } from './brandStar';
-import { packImagePages, sessionPageCount } from './imageLayout';
+import { groupByOrientation, orientationOf, packImagePages, sessionPageCount } from './imageLayout';
 
 /**
  * مجلة الـFlipbook كملف HTML واحد قائم بذاته يعمل دون اتصال بالإنترنت:
@@ -296,6 +297,70 @@ ${img(coverKey, 'cover-bg')}
 <div class="back-text"><div class="bar"></div><p class="b1">إدارة عمليات التدريب</p><p class="b2">وكالة الجامعة للتدريب</p><p class="b3">جامعة نايف العربية للعلوم الأمنية</p></div>
 </div>`;
 
+  // ---- عارض «القصص» للجوال: شاشة كاملة لكل صفحة، سحب أفقي، وشريط تقدّم بألوان المحاور ----
+  const stories: string[] = [];
+  const storySections: { start: number; length: number; color: string }[] = [];
+  const closeSection = (start: number, color: string) => storySections.push({ start, length: stories.length - start, color });
+  const storySessionStart: number[] = [];
+  const dateRange = formatDateRange(course.start_date, course.end_date);
+
+  stories.push(`<div class="st-cover">${img(coverKey, 'st-bg')}<div class="st-shade"></div>${star('st-star-tl')}${img('logoW', 'st-logo', 'جامعة نايف العربية للعلوم الأمنية')}
+<div class="st-cover-text"><i class="st-bar"></i><p class="st-kicker">الدورة التدريبية</p><h1>${esc(course.title)}</h1>
+${dateRange ? `<p class="st-meta">${esc(dateRange)}</p>` : ''}${course.location ? `<p class="st-meta">${esc(course.location)}</p>` : ''}
+<p class="st-hint">← اسحب أو المس يسار الشاشة للتصفح</p></div></div>`);
+  if (course.welcome_text) {
+    stories.push(`<div class="st-paper">${star('st-star-br')}<div class="st-center">${star('st-orn')}<p class="st-welcome">${esc(course.welcome_text)}</p><i class="st-bar"></i></div></div>`);
+  }
+  stories.push(`<div class="st-paper">${star('st-star-br')}<div class="st-scroll st-text"><h2 class="st-h2">عن الدورة</h2><i class="st-bar"></i>
+${course.description ? `<p class="st-desc">${esc(course.description)}</p>` : ''}
+${course.trainer_names.length ? `<h3 class="st-h3">المدربون</h3><div class="chips">${course.trainer_names.map((n) => `<span>${esc(n)}</span>`).join('')}</div>` : ''}
+${coordinator ? `<p class="st-by">إعداد المجلة: <b>${esc(coordinator.full_name)}</b></p>` : ''}</div></div>`);
+  const tocIndex = sessions.length ? stories.length : -1;
+  if (sessions.length) stories.push('');
+  closeSection(0, '#ffffff');
+
+  sessions.forEach((s, i) => {
+    const a = sessionAccent(i);
+    const start = stories.length;
+    storySessionStart.push(start);
+    const imgs = bySession.get(s.id) ?? [];
+    const mainKey = imgs[0] ? imageKey.get(imgs[0].id) ?? null : null;
+    stories.push(`<div class="st-session" style="--ac:${a.main};--acd:${a.deep};--act:${a.tint}"><div class="st-hero">${img(mainKey, 'st-cover-img')}<div class="st-hero-shade"></div></div>
+${star('st-star-bl')}<span class="st-num">${toArabic(i + 1)}</span>
+<div class="st-scroll st-sbody"><span class="kick"><i></i>الجلسة ${esc(sessionOrdinal(i))}</span><h2>${esc(s.title)}</h2><div class="gbar"></div>${s.description ? `<p class="st-desc">${esc(s.description)}</p>` : ''}</div></div>`);
+    for (const m of groupByOrientation(imgs.slice(1))) stories.push(photoStory(m, a, i, s.title));
+    closeSection(start, a.main);
+  });
+  if (unassigned.length) {
+    const start = stories.length;
+    for (const m of groupByOrientation(unassigned)) stories.push(photoStory(m, GOLD, null, 'صور من الدورة'));
+    closeSection(start, GOLD.main);
+  }
+  const backIdx = stories.length;
+  stories.push(`<div class="st-back">${star('st-star-br2')}${img('logoW', 'st-back-logo', 'جامعة نايف العربية للعلوم الأمنية')}
+<div class="st-back-text"><i class="st-bar"></i><p class="b1">إدارة عمليات التدريب</p><p class="b2">وكالة الجامعة للتدريب</p><p class="b3">جامعة نايف العربية للعلوم الأمنية</p></div>
+<button type="button" class="st-btn" data-go="0">العودة للغلاف</button></div>`);
+  closeSection(backIdx, GOLD.main);
+
+  if (tocIndex >= 0) {
+    stories[tocIndex] = `<div class="st-paper">${star('st-star-br')}<div class="st-scroll st-toc"><h2 class="st-h2">المحتويات</h2><i class="st-bar"></i><ol>${sessions
+      .map((s, i) => {
+        const a = sessionAccent(i);
+        return `<li><button type="button" data-go="${storySessionStart[i]}"><span class="toc-n" style="background:linear-gradient(135deg,${a.main},${a.deep})">${toArabic(i + 1)}</span><span class="st-toc-t" style="color:${a.deep}">${esc(s.title)}</span><span class="st-chev">‹</span></button></li>`;
+      })
+      .join('')}</ol></div></div>`;
+  }
+
+  function photoStory(m: (typeof images)[number], a: SessionAccent, index: number | null, title: string): string {
+    const key = imageKey.get(m.id) ?? null;
+    const portrait = orientationOf(m) === 'portrait';
+    return `<div class="st-photo">${portrait ? '' : img(key, 'st-blur')}${img(key, portrait ? 'st-fill' : 'st-fit', m.caption ?? title)}<div class="st-pshade"></div>
+<div class="st-pcap">${index !== null ? `<span class="toc-n st-pn" style="background:linear-gradient(135deg,${a.main},${a.deep})">${toArabic(index + 1)}</span>` : ''}<div><p class="st-pt">${esc(title)}</p>${m.caption ? `<p class="st-pc">${esc(m.caption)}</p>` : ''}</div></div></div>`;
+  }
+
+  const storiesHtml = stories.map((html, i) => `<section class="st" data-index="${i}">${html}</section>`).join('\n');
+  const storiesMeta = JSON.stringify(storySections);
+
   const pagesHtml = [coverPage, ...interior, backPage].join('\n');
   // نمنع إغلاق وسم script مبكرًا داخل بيانات JSON
   const assetsJson = JSON.stringify(assets).replace(/</g, '\\u003c');
@@ -443,6 +508,72 @@ body{font-family:'Cairo',system-ui,sans-serif;background:#0a3d35;color:#2a302d;o
 /* نجمة كبيرة على الغلافين */
 .cover-star{position:absolute;width:520px;height:523px;top:-170px;left:-170px;fill:#fff;opacity:.1;pointer-events:none}
 .back-star{position:absolute;width:560px;height:563px;bottom:-190px;right:-190px;fill:${SECONDARY};opacity:.16;pointer-events:none}
+/* عارض القصص (الجوال) */
+.stories{position:fixed;inset:0;background:#000;z-index:5}
+.stories[hidden]{display:none}
+.s-top{position:absolute;inset-inline:0;top:0;z-index:3;padding:max(env(safe-area-inset-top),10px) 12px 22px;background:linear-gradient(to bottom,rgba(0,0,0,.55),transparent);pointer-events:none}
+.s-bar{display:flex;gap:4px}
+.s-seg{height:4px;border-radius:9999px;background:rgba(255,255,255,.25);overflow:hidden}
+.s-seg i{display:block;height:100%;width:0;border-radius:9999px;transition:width .3s}
+.s-row{margin-top:10px;display:flex;justify-content:center}
+.s-count{border-radius:9999px;background:rgba(0,0,0,.3);padding:3px 12px;font-size:12px;color:rgba(255,255,255,.85);font-variant-numeric:tabular-nums}
+.s-scroll{display:flex;height:100dvh;width:100%;overflow-x:auto;overflow-y:hidden;scroll-snap-type:x mandatory;overscroll-behavior:contain;scrollbar-width:none}
+.s-scroll::-webkit-scrollbar{display:none}
+.st{position:relative;height:100%;width:100%;flex-shrink:0;scroll-snap-align:start;scroll-snap-stop:always;overflow:hidden}
+.st>div{position:relative;width:100%;height:100%;overflow:hidden}
+.st svg{position:absolute;pointer-events:none}
+.st-scroll{overflow-y:auto}
+.st-bar{display:block;height:4px;width:56px;border-radius:9999px;background:${SECONDARY};margin:10px 0 14px}
+.st-cover{background:${PRIMARY};color:#fff}
+.st-bg,.st-cover-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.st-shade{position:absolute;inset:0;background:linear-gradient(to top,${PRIMARY_DARK},rgba(14,92,80,.6),rgba(0,0,0,.3))}
+.st-star-tl{width:320px;height:322px;left:-96px;top:-96px;fill:#fff;opacity:.1}
+.st-logo{position:absolute;right:24px;top:80px;height:56px;object-fit:contain}
+.st-cover-text{position:absolute;inset-inline:0;bottom:0;padding:28px 28px 64px}
+.st-cover-text .st-bar{height:6px;width:64px;margin:0 0 12px}
+.st-kicker{font-size:14px;font-weight:500;color:${SECONDARY};margin-bottom:6px}
+.st-cover h1{font-size:30px;font-weight:600;line-height:1.35}
+.st-meta{margin-top:8px;font-size:14px;color:rgba(255,255,255,.85)}
+.st-hint{margin-top:28px;font-size:12px;color:rgba(255,255,255,.6)}
+.st-paper{background:#F7F3EC}
+.st-paper::before{content:"";position:absolute;inset:0;background:radial-gradient(90% 60% at 100% 100%,#F3ECE0 0%,transparent 65%)}
+.st-star-br{width:320px;height:322px;right:-112px;bottom:-112px;fill:${SECONDARY};opacity:.13}
+.st-center{position:relative;display:flex;height:100%;flex-direction:column;align-items:center;justify-content:center;padding:0 32px;text-align:center}
+.st-orn{position:static!important;width:48px;height:48px;fill:${SECONDARY};margin-bottom:24px}
+.st-welcome{font-size:18px;font-weight:500;line-height:2.1;color:${PRIMARY}}
+.st-text,.st-toc{position:relative;height:100%;padding:96px 28px 40px}
+.st-text{display:flex;flex-direction:column;justify-content:center}
+.st-h2{font-size:24px;font-weight:600;color:${PRIMARY}}
+.st-h3{margin:22px 0 8px;font-weight:600;color:${PRIMARY}}
+.st-desc{white-space:pre-line;line-height:2;color:#2a302d}
+.st-by{margin-top:22px;font-size:14px;color:${MUTED}}.st-by b{color:${PRIMARY}}
+.st-toc ol{list-style:none;display:flex;flex-direction:column;gap:10px}
+.st-toc button{display:flex;width:100%;align-items:center;gap:12px;border:0;border-radius:16px;background:rgba(255,255,255,.85);padding:12px;font:inherit;text-align:right;box-shadow:0 1px 2px rgba(0,0,0,.05);cursor:pointer}
+.st-toc .toc-n{width:40px;height:36px;font-size:13px}
+.st-toc-t{flex:1;min-width:0;font-size:15px;font-weight:500;line-height:1.4}
+.st-chev{color:${MUTED};font-size:20px}
+.st-session{background:#F7F3EC;display:flex;flex-direction:column}
+.st-hero{position:relative;height:46%;flex-shrink:0;overflow:hidden;background:var(--ac);border-bottom:6px solid var(--ac)}
+.st-hero-shade{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.5),transparent,rgba(0,0,0,.3))}
+.st-star-bl{width:320px;height:322px;left:-112px;bottom:-112px;fill:var(--ac);opacity:.1}
+.st-num{position:absolute;left:16px;top:47%;font-size:150px;font-weight:700;line-height:1;color:var(--act);pointer-events:none}
+.st-sbody{position:relative;flex:1;padding:24px 28px 40px}
+.st-sbody h2{margin-top:8px;font-size:24px;font-weight:600;line-height:1.4;color:var(--acd)}
+.st-sbody .gbar{height:3px;width:56px;border-radius:9999px;margin:12px 0;background:linear-gradient(to left,var(--ac),${SECONDARY})}
+.st-photo{background:#000}
+.st-blur{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scale(1.25);filter:blur(28px) brightness(.9) saturate(1.25);opacity:.9}
+.st-fill,.st-fit{position:absolute;inset:0;width:100%;height:100%}
+.st-fill{object-fit:cover}.st-fit{object-fit:contain}
+.st-pshade{position:absolute;inset:0;background:linear-gradient(to bottom,rgba(0,0,0,.55),transparent 22%,transparent 72%,rgba(0,0,0,.7))}
+.st-pcap{position:absolute;inset-inline:0;bottom:0;display:flex;align-items:flex-end;gap:12px;padding:24px 24px 40px;color:#fff}
+.st-pn{width:40px;height:36px;font-size:13px}
+.st-pt{font-size:14px;font-weight:600}.st-pc{font-size:12px;color:rgba(255,255,255,.8)}
+.st-back{display:flex!important;flex-direction:column;align-items:center;justify-content:center;background:${PRIMARY};color:#fff;text-align:center}
+.st-star-br2{width:384px;height:386px;right:-128px;bottom:-128px;fill:${SECONDARY};opacity:.18}
+.st-back-logo{position:relative;height:96px;object-fit:contain}
+.st-back-text{position:relative;margin-top:56px;display:flex;flex-direction:column;align-items:center;gap:4px}
+.st-back-text .st-bar{margin:0 0 12px}
+.st-btn{position:relative;margin-top:40px;border:0;border-radius:16px;background:rgba(255,255,255,.15);padding:10px 20px;font:inherit;font-size:14px;color:#fff;cursor:pointer}
 /* شريط التحكم */
 .controls{margin-top:12px;display:flex;align-items:center;gap:16px;color:rgba(255,255,255,.85)}
 .btn{display:inline-flex;width:40px;height:40px;align-items:center;justify-content:center;border:0;border-radius:9999px;background:rgba(255,255,255,.15);color:#fff;cursor:pointer;transition:background .15s}
@@ -470,7 +601,14 @@ body{font-family:'Cairo',system-ui,sans-serif;background:#0a3d35;color:#2a302d;o
 <template id="pages">
 ${pagesHtml}
 </template>
-<script>var ASSETS=${assetsJson};</script>
+<div class="stories" id="stories" hidden>
+<div class="s-top"><div class="s-bar" id="sbar"></div><div class="s-row"><span class="s-count" id="scount"></span></div></div>
+<div class="s-scroll" id="sscroll"></div>
+</div>
+<template id="stories-tpl">
+${storiesHtml}
+</template>
+<script>var ASSETS=${assetsJson};var STORY_SECTIONS=${storiesMeta};</script>
 <script>${safeJs}</script>
 <script>
 (function(){
@@ -486,8 +624,38 @@ ${pagesHtml}
     counter.textContent=ar(n-i)+' / '+ar(n);
     prev.disabled=i>=n-1;next.disabled=i===0;
   }
+  // ---- القصص (الجوال) ----
+  var stories=document.getElementById('stories'),sscroll=document.getElementById('sscroll'),sbar=document.getElementById('sbar'),scount=document.getElementById('scount');
+  var sMounted=false,sCur=0,sEls=[],segs=[];
+  function fillImgs(el){var imgs=el.querySelectorAll('img[data-k]');for(var j=0;j<imgs.length;j++){var src=ASSETS[imgs[j].getAttribute('data-k')];if(src)imgs[j].src=src;}}
+  function sGo(i){var el=sEls[Math.max(0,Math.min(i,sEls.length-1))];if(el)el.scrollIntoView({behavior:'smooth',inline:'start',block:'nearest'});}
+  function sUpdate(){
+    scount.textContent=ar(sCur+1)+' / '+ar(sEls.length);
+    for(var k=0;k<STORY_SECTIONS.length;k++){var sec=STORY_SECTIONS[k],f=sCur>=sec.start+sec.length?1:sCur<sec.start?0:(sCur-sec.start+1)/sec.length;segs[k].style.width=(f*100)+'%';}
+  }
+  function mountStories(){
+    if(sMounted)return;sMounted=true;
+    sscroll.appendChild(document.getElementById('stories-tpl').content.cloneNode(true));
+    fillImgs(sscroll);
+    sEls=Array.prototype.slice.call(sscroll.querySelectorAll('section.st'));
+    STORY_SECTIONS.forEach(function(sec){var d=document.createElement('div');d.className='s-seg';d.style.flex=String(Math.max(1,sec.length));var i=document.createElement('i');i.style.background=sec.color;d.appendChild(i);sbar.appendChild(d);segs.push(i);});
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){sCur=+e.target.getAttribute('data-index');sUpdate();}});},{root:sscroll,threshold:.6});
+    sEls.forEach(function(el){io.observe(el);});
+    sscroll.addEventListener('click',function(e){
+      var go=e.target.closest('[data-go]');if(go){sGo(+go.getAttribute('data-go'));return;}
+      if(e.target.closest('a,button,.st-scroll'))return;
+      var x=e.clientX/window.innerWidth;if(x<.33)sGo(sCur+1);else if(x>.67)sGo(sCur-1);
+    });
+    sUpdate();
+  }
   function layout(){
     var single=window.innerWidth<768,s=single?PORT:LAND,pages=single?1:2;
+    // الجوال: عارض القصص بدل التقليب
+    if(single){
+      if(pf){try{pf.destroy();}catch(e){}pf=null;}
+      mode='s';root.style.display='none';stories.hidden=false;mountStories();return;
+    }
+    root.style.display='';stories.hidden=true;
     var scale=Math.max(.2,Math.min((window.innerWidth-12)/(s.w*pages),(window.innerHeight-128)/s.h,1.25));
     holder.style.width=(s.w*pages*scale)+'px';holder.style.height=(s.h*scale)+'px';
     scaler.style.width=(s.w*pages)+'px';scaler.style.height=s.h+'px';scaler.style.transform='scale('+scale+')';
@@ -515,6 +683,7 @@ ${pagesHtml}
   prev.onclick=function(){pf&&pf.flipNext();};
   next.onclick=function(){pf&&pf.flipPrev();};
   window.addEventListener('keydown',function(e){
+    if(mode==='s'){if(e.key==='ArrowLeft')sGo(sCur+1);else if(e.key==='ArrowRight')sGo(sCur-1);return;}
     if(!pf)return;
     if(e.key==='ArrowRight')pf.flipNext();else if(e.key==='ArrowLeft')pf.flipPrev();
   });
