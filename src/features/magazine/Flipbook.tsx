@@ -1,10 +1,11 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { X, ChevronRight, ChevronLeft } from 'lucide-react';
+import { X, ChevronRight, ChevronLeft, Download } from 'lucide-react';
 import type { PageFlip as PageFlipInstance } from 'page-flip';
 import { formatArabicDate } from '@/lib/utils';
 import type { MagazineData } from './data';
+import { sessionAccent, type SessionAccent } from './accents';
 
 /**
  * وضع Flipbook: مجلة أفقية أنيقة. صورة واحدة كبيرة لكل صفحة (تناسب الصور الأفقية)،
@@ -177,19 +178,38 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
 
   // كل المحاور تُعرض بترقيم تسلسلي، ولو لم تُسند لها صور
   const shownSessions = sessions;
+
+  // صفحة المحتويات: نحسب رقم أول صفحة لكل محور مسبقًا (صفحة المحور + صفحة لكل صورة إضافية)
+  if (shownSessions.length > 0) {
+    let at = pageNo + 1; // صفحة المحتويات نفسها
+    const starts = shownSessions.map((s) => {
+      const first = at + 1;
+      at += Math.max(1, (bySession.get(s.id) ?? []).length);
+      return first;
+    });
+    interior.push(
+      <MagPage key="toc" heading="المحتويات" courseTitle={course.title} pageNo={++pageNo} showMoi={showMoi}>
+        <TocList items={shownSessions.map((s, i) => ({ title: s.title, page: starts[i], accent: sessionAccent(i) }))} />
+      </MagPage>,
+    );
+  }
   shownSessions.forEach((s, i) => {
     const sImgs = bySession.get(s.id) ?? [];
     const main = sImgs[0];
+    const accent = sessionAccent(i);
     interior.push(
-      <MagPage key={`s-${s.id}`} heading={s.title} courseTitle={course.title} pageNo={++pageNo} showMoi={showMoi}>
+      <MagPage key={`s-${s.id}`} heading={s.title} courseTitle={course.title} pageNo={++pageNo} showMoi={showMoi} accent={accent}>
         <div className={`flex h-full gap-5 ${singlePage ? 'flex-col justify-center' : ''}`}>
           {/* عمود النص (يمين في RTL؛ أعلى الصفحة على الجوال) */}
           <div className={`flex flex-col justify-center ${main && !singlePage ? 'w-[44%]' : 'w-full'}`}>
-            <span className="mb-2 w-fit rounded-full bg-secondary/15 px-3 py-1 text-[11px] font-bold text-secondary">
+            <span
+              className="mb-2 w-fit rounded-full px-3 py-1 text-[11px] font-bold"
+              style={{ backgroundColor: accent.tint, color: accent.main }}
+            >
               الجلسة {toArabic(i + 1)}
             </span>
-            <h2 className="text-[19px] font-semibold leading-snug text-primary">{s.title}</h2>
-            <div className="mt-2 mb-3 h-1 w-12 rounded-full bg-secondary" />
+            <h2 className="text-[19px] font-semibold leading-snug" style={{ color: accent.main }}>{s.title}</h2>
+            <div className="mt-2 mb-3 h-1 w-12 rounded-full" style={{ backgroundColor: accent.main }} />
             {(s.presenter || s.time_label) && (
               <div className="mb-3 flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-muted">
                 {s.presenter && <span>المقدّم: {s.presenter}</span>}
@@ -222,7 +242,7 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
 
     // بقية صور المحور: صفحة كبيرة لكل صورة، عنوانها اسم المحور فقط
     sImgs.slice(1).forEach((m) => {
-      interior.push(imagePage(m, s.title, course.title, ++pageNo, showMoi, s.title));
+      interior.push(imagePage(m, s.title, course.title, ++pageNo, showMoi, s.title, accent));
     });
   });
 
@@ -250,6 +270,15 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
       >
         <X className="size-5" /> إغلاق
       </button>
+      {course.magazine_slug && (
+        <a
+          href={`/m/${course.magazine_slug}/offline`}
+          title="ملف HTML واحد يفتح على أي جهاز دون اتصال بالإنترنت"
+          className="absolute left-3 top-3 z-10 inline-flex items-center gap-2 rounded-2xl bg-white/15 px-4 py-2 text-sm text-white hover:bg-white/25"
+        >
+          <Download className="size-5" /> تنزيل للعرض دون اتصال
+        </a>
+      )}
 
       {/* غلاف يحجز المساحة المُصغّرة، والداخل بمقاس التصميم مع تصغير بتناسب واحد */}
       <div style={{ width: PAGE_W * (singlePage ? 1 : 2) * scale, height: PAGE_H * scale }} className="relative">
@@ -365,14 +394,15 @@ function imagePage(
   pageNo: number,
   showMoi: boolean,
   sectionLabel?: string,
+  accent?: SessionAccent,
 ) {
   return (
-    <MagPage key={`img-${m.id}`} heading={heading} courseTitle={courseTitle} pageNo={pageNo} showMoi={showMoi}>
+    <MagPage key={`img-${m.id}`} heading={heading} courseTitle={courseTitle} pageNo={pageNo} showMoi={showMoi} accent={accent}>
       <div className="flex h-full flex-col">
         {sectionLabel && (
           <div className="mb-2 shrink-0">
-            <h2 className="text-lg font-semibold text-primary">{sectionLabel}</h2>
-            <div className="mt-1 h-1 w-12 rounded-full bg-secondary" />
+            <h2 className="text-lg font-semibold text-primary" style={accent && { color: accent.main }}>{sectionLabel}</h2>
+            <div className="mt-1 h-1 w-12 rounded-full bg-secondary" style={accent && { backgroundColor: accent.main }} />
           </div>
         )}
         <div className="flex min-h-0 flex-1 items-center justify-center">
@@ -406,23 +436,29 @@ function MagPage({
   courseTitle,
   pageNo,
   showMoi,
+  accent,
   children,
 }: {
   heading: string;
   courseTitle: string;
   pageNo: number;
   showMoi: boolean;
+  /** لون المحور: يلوّن الشريط الجانبي والترويسة ورقم الصفحة */
+  accent?: SessionAccent;
   children: React.ReactNode;
 }) {
   return (
     <div className="flip-page magazine-pattern relative overflow-hidden">
       {/* شريط جانبي أخضر */}
-      <div className="absolute inset-y-0 right-0 w-1.5 bg-gradient-to-b from-primary to-primary-dark" />
+      <div
+        className="absolute inset-y-0 right-0 w-1.5 bg-gradient-to-b from-primary to-primary-dark"
+        style={accent && { background: accent.main }}
+      />
 
       {/* الترويسة مثبّتة أعلى الصفحة: عنوان الجلسة يمينًا ثم الشعارات */}
       <div className="absolute inset-x-0 top-0 px-6 pt-4">
         <div className="flex items-center justify-between">
-          <span className="truncate pl-3 text-xs font-semibold text-primary">{heading}</span>
+          <span className="truncate pl-3 text-xs font-semibold text-primary" style={accent && { color: accent.main }}>{heading}</span>
           <div className="flex shrink-0 items-center gap-2.5">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img src="/logo-nauss.png" alt="" className="h-7 object-contain" />
@@ -443,9 +479,41 @@ function MagPage({
 
       {/* التذييل مثبّت أسفل الصفحة: رقم الصفحة يسارًا وعنوان الدورة يمينًا */}
       <div className="absolute inset-x-6 bottom-3 flex items-center justify-between border-t border-secondary/25 pt-2">
-        <span className="flex size-6 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white">{pageNo}</span>
+        <span
+          className="flex size-6 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white"
+          style={accent && { backgroundColor: accent.main }}
+        >
+          {toArabic(pageNo)}
+        </span>
         <span className="truncate pr-3 text-[10px] tracking-wide text-muted">{courseTitle}</span>
       </div>
+    </div>
+  );
+}
+
+/** قائمة المحتويات: رقم المحور بلونه، العنوان، ثم رقم الصفحة */
+function TocList({ items }: { items: { title: string; page: number; accent: SessionAccent }[] }) {
+  // نصغّر الأسطر تلقائيًا حين تكثر المحاور لتتسع في صفحة واحدة
+  const dense = items.length > 10;
+  return (
+    <div className="flex h-full flex-col justify-center">
+      <h2 className="text-xl font-semibold text-primary">المحتويات</h2>
+      <div className="mt-2 mb-3 h-1 w-14 rounded-full bg-secondary" />
+      <ol className={dense ? 'space-y-1' : 'space-y-2'}>
+        {items.map((it, i) => (
+          <li key={i} className={`flex items-center gap-3 ${dense ? 'text-[12px]' : 'text-[13.5px]'}`}>
+            <span
+              className={`flex shrink-0 items-center justify-center rounded-full font-bold text-white ${dense ? 'size-5 text-[10px]' : 'size-6 text-[11px]'}`}
+              style={{ backgroundColor: it.accent.main }}
+            >
+              {toArabic(i + 1)}
+            </span>
+            <span className="truncate font-medium text-[#2a302d]">{it.title}</span>
+            <span className="min-w-6 flex-1 border-b border-dotted border-secondary/60" />
+            <span className="shrink-0 tabular-nums text-muted">{toArabic(it.page)}</span>
+          </li>
+        ))}
+      </ol>
     </div>
   );
 }

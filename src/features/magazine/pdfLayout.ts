@@ -8,9 +8,16 @@ import type { Session } from '@/lib/database.types';
  * بقية الصور = صفحة كبيرة لكل صورة، فوقها عنوان المحور فقط. لا يوجد «معرض».
  */
 
+/** مقاس الصفحة المربعة: ٢١×٢١ سم بالنقاط */
+export const PDF_PAGE: [number, number] = [595.28, 595.28];
+/** ارتفاع شريط صورة صفحة المحور الرئيسية */
+export const PDF_HERO_BAND = 300;
+/** ارتفاع شريط العنوان فوق الصورة الكبيرة */
+export const PDF_TITLE_BAND = 84;
+
 const ASPECT = {
-  sessionHero: 595 / 470, // صورة المحور الرئيسية (شريط ملء العرض مع النص)
-  bigImage: 595 / 725, // صورة كبيرة تملأ الصفحة تحت عنوان المحور
+  sessionHero: PDF_PAGE[0] / PDF_HERO_BAND, // صورة المحور الرئيسية (شريط ملء العرض مع النص)
+  bigImage: PDF_PAGE[0] / (PDF_PAGE[1] - PDF_TITLE_BAND - 4), // صورة كبيرة تملأ الصفحة تحت عنوان المحور
 };
 
 interface ImgMeta {

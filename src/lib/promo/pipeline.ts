@@ -9,6 +9,7 @@
  */
 
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { cleanSessionTitle } from '@/lib/text';
 import { promises as fs } from 'fs';
 import os from 'os';
 import path from 'path';
@@ -72,7 +73,7 @@ export async function loadCourseContext(
     location: course.location,
     trainers: course.trainer_names ?? [],
     welcomeText: course.welcome_text,
-    sessions: sessions ?? [],
+    sessions: (sessions ?? []).map((x) => ({ ...x, title: cleanSessionTitle(x.title) })),
   };
 }
 

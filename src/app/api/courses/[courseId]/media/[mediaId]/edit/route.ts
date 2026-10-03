@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import { createClient } from '@/lib/supabase/server';
+import { createClient, createServiceClient } from '@/lib/supabase/server';
 import { BUCKET_PROCESSED, mediaPath } from '@/lib/storage';
 import { reprocessImage, type ImageEdit } from '@/lib/media/edit';
 
@@ -36,7 +36,9 @@ export async function POST(
     return NextResponse.json({ error: 'طلب غير صالح' }, { status: 400 });
   }
 
-  const store = supabase.storage.from(BUCKET_PROCESSED);
+  // الكتابة فوق ملفات قائمة (upsert) تتطلب صلاحية UPDATE على التخزين وهي غير ممنوحة للمنسق؛
+  // تحققنا من ملكية الصورة أعلاه عبر RLS، فنكتب بعميل الخدمة
+  const store = createServiceClient().storage.from(BUCKET_PROCESSED);
   const fullPath = mediaPath(params.courseId, params.mediaId, 'full', 'webp');
   const largePath = mediaPath(params.courseId, params.mediaId, 'large', 'webp');
   const thumbPath = mediaPath(params.courseId, params.mediaId, 'thumb', 'webp');
@@ -73,8 +75,11 @@ export async function POST(
     put(largePath, out.large),
     put(thumbPath, out.thumb),
   ]);
-  if (results.some((r) => r.error))
+  const failed = results.find((r) => r.error);
+  if (failed) {
+    console.error('[media/edit] upload failed:', failed.error);
     return NextResponse.json({ error: 'تعذّر حفظ الصورة المعدّلة' }, { status: 500 });
+  }
 
   // كسر ذاكرة التخزين المؤقت: المسار ثابت فنغيّر رقم النسخة في الرابط
   const v = Date.now();

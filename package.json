@@ -11,7 +11,8 @@
     "seed:admin": "tsx scripts/seed-admin.ts",
     "worker:media": "tsx scripts/media-worker.ts",
     "worker:promo": "tsx scripts/promo-worker.ts",
-    "promo:check": "tsx scripts/promo-selftest.ts"
+    "promo:check": "tsx scripts/promo-selftest.ts",
+    "postinstall": "patch-package"
   },
   "dependencies": {
     "@azure/msal-node": "^2.16.2",
@@ -44,6 +45,7 @@
     "dotenv": "^17.4.2",
     "eslint": "^8.57.1",
     "eslint-config-next": "14.2.15",
+    "patch-package": "^8.0.1",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.14",
     "tsx": "^4.19.1",

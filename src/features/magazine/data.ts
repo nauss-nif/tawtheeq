@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import type { Course, Media, Session } from '@/lib/database.types';
+import { cleanSessionTitle, tidyArabicText } from '@/lib/text';
 
 export interface MagazineCoordinator {
   full_name: string;
@@ -66,5 +67,19 @@ export async function getMagazineBySlug(slug: string): Promise<MagazineData | nu
   // نعتمد الآن على صورة غلاف الدورة المرفوعة + خلفية العلامة الأنيقة للجامعة.
   const landmarkUrl = null;
 
-  return { course, cover, images, videos, sessions: sessions ?? [], coordinator, landmarkUrl };
+  // تنقية النصوص عند العرض: تصلح كل المجلات القائمة دون تعديل بياناتها المخزّنة
+  const cleanCourse: Course = {
+    ...course,
+    title: tidyArabicText(course.title),
+    description: tidyArabicText(course.description),
+    welcome_text: tidyArabicText(course.welcome_text),
+    location: tidyArabicText(course.location),
+  };
+  const cleanSessions = (sessions ?? []).map((s) => ({
+    ...s,
+    title: cleanSessionTitle(s.title),
+    description: tidyArabicText(s.description),
+  }));
+
+  return { course: cleanCourse, cover, images, videos, sessions: cleanSessions, coordinator, landmarkUrl };
 }

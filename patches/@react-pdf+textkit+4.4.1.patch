@@ -1,0 +1,70 @@
+diff --git a/node_modules/@react-pdf/textkit/lib/textkit.cjs b/node_modules/@react-pdf/textkit/lib/textkit.cjs
+index 7879740..3adf99b 100644
+--- a/node_modules/@react-pdf/textkit/lib/textkit.cjs
++++ b/node_modules/@react-pdf/textkit/lib/textkit.cjs
+@@ -1078,6 +1078,13 @@ var getItemAtIndex = function getItemAtIndex(runs, objectName, index) {
+   }
+   throw new Error("index " + index + " out of range");
+ };
++var getGlyphKeyAtIndex = function getGlyphKeyAtIndex(runs, index) {
++  for (var i = 0; i < runs.length; i += 1) {
++    var run = runs[i];
++    if (index >= run.start && index < run.end) return i + ':' + run.glyphIndices[index - run.start];
++  }
++  return 'i' + index;
++};
+ var reorderLine = function reorderLine(attributedString) {
+   var _attributedString$run;
+   var levels = getBidiLevels$1(attributedString.runs);
+@@ -1107,11 +1114,14 @@ var reorderLine = function reorderLine(attributedString) {
+     for (var i = 0; i < selectedIndices.length; i += 1) {
+       var index = selectedIndices[i];
+       var glyph = getItemAtIndex(attributedString.runs, 'glyphs', index);
+-      if (addedGlyphs.has(glyph.id)) continue;
++      // مفتاح موضع الرسم داخل السطر لا رقمه: fontkit يعيد الكائن نفسه لكل تكرار للرسم،
++      // فالمقارنة بالرقم/الكائن كانت تُسقط ligature «لا» الثانية في السطر
++      var glyphKey = getGlyphKeyAtIndex(attributedString.runs, index);
++      if (addedGlyphs.has(glyphKey)) continue;
+       updatedGlyphs.push(glyph);
+       updatedPositions.push(getItemAtIndex(attributedString.runs, 'positions', index));
+       if (glyph.isLigature) {
+-        addedGlyphs.add(glyph.id);
++        addedGlyphs.add(glyphKey);
+       }
+     }
+     return _extends__default.default({}, run, {
+diff --git a/node_modules/@react-pdf/textkit/lib/textkit.js b/node_modules/@react-pdf/textkit/lib/textkit.js
+index 9c407c8..951d280 100644
+--- a/node_modules/@react-pdf/textkit/lib/textkit.js
++++ b/node_modules/@react-pdf/textkit/lib/textkit.js
+@@ -1064,6 +1064,13 @@ var getItemAtIndex = function getItemAtIndex(runs, objectName, index) {
+   }
+   throw new Error("index " + index + " out of range");
+ };
++var getGlyphKeyAtIndex = function getGlyphKeyAtIndex(runs, index) {
++  for (var i = 0; i < runs.length; i += 1) {
++    var run = runs[i];
++    if (index >= run.start && index < run.end) return i + ':' + run.glyphIndices[index - run.start];
++  }
++  return 'i' + index;
++};
+ var reorderLine = function reorderLine(attributedString) {
+   var _attributedString$run;
+   var levels = getBidiLevels$1(attributedString.runs);
+@@ -1093,11 +1100,14 @@ var reorderLine = function reorderLine(attributedString) {
+     for (var i = 0; i < selectedIndices.length; i += 1) {
+       var index = selectedIndices[i];
+       var glyph = getItemAtIndex(attributedString.runs, 'glyphs', index);
+-      if (addedGlyphs.has(glyph.id)) continue;
++      // مفتاح موضع الرسم داخل السطر لا رقمه: fontkit يعيد الكائن نفسه لكل تكرار للرسم،
++      // فالمقارنة بالرقم/الكائن كانت تُسقط ligature «لا» الثانية في السطر
++      var glyphKey = getGlyphKeyAtIndex(attributedString.runs, index);
++      if (addedGlyphs.has(glyphKey)) continue;
+       updatedGlyphs.push(glyph);
+       updatedPositions.push(getItemAtIndex(attributedString.runs, 'positions', index));
+       if (glyph.isLigature) {
+-        addedGlyphs.add(glyph.id);
++        addedGlyphs.add(glyphKey);
+       }
+     }
+     return _extends({}, run, {

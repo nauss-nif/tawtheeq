@@ -7,6 +7,7 @@ import { cn, formatArabicDate } from '@/lib/utils';
 import { TEMPLATES } from './templates';
 import type { MagazineData } from './data';
 import { Flipbook } from './Flipbook';
+import { sessionAccent } from './accents';
 
 const NAV = [
   { id: 'intro', label: 'تعريف' },
@@ -120,6 +121,13 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
             >
               <Download className="size-4" /> <span className="hidden sm:inline">PDF</span>
             </a>
+            <a
+              href={`/m/${course.magazine_slug}/offline`}
+              title="ملف HTML واحد يفتح على أي جهاز دون اتصال بالإنترنت"
+              className="inline-flex items-center gap-1.5 rounded-xl bg-white/15 px-3 py-1.5 text-sm font-medium text-white hover:bg-white/25"
+            >
+              <Download className="size-4" /> <span className="hidden sm:inline">نسخة دون اتصال</span>
+            </a>
           </div>
         </div>
       </nav>
@@ -179,6 +187,7 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
             <div className="flex flex-col gap-8">
               {sessions.map((sn, i) => {
                 const sImgs = bySession.get(sn.id) ?? [];
+                const accent = sessionAccent(i);
                 return (
                   <motion.article
                     key={sn.id}
@@ -186,15 +195,19 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true, margin: '-40px' }}
                     transition={{ duration: 0.45 }}
-                    className="grid gap-6 rounded-3xl border border-secondary/30 bg-surface p-6 shadow-soft md:grid-cols-2"
+                    className="grid gap-6 rounded-3xl border border-secondary/30 border-r-4 bg-surface p-6 shadow-soft md:grid-cols-2"
+                    style={{ borderRightColor: accent.main }}
                   >
                     {/* النص */}
                     <div className={sImgs.length === 0 ? 'md:col-span-2' : ''}>
-                      <span className="inline-block rounded-full bg-secondary/15 px-3 py-1 text-xs font-bold text-secondary">
+                      <span
+                        className="inline-block rounded-full px-3 py-1 text-xs font-bold"
+                        style={{ backgroundColor: accent.tint, color: accent.main }}
+                      >
                         الجلسة {toArabic(i + 1)}
                       </span>
-                      <h3 className="mt-3 text-xl font-semibold text-primary">{sn.title}</h3>
-                      <div className="mt-1 mb-3 h-1 w-12 rounded-full bg-secondary" />
+                      <h3 className="mt-3 text-xl font-semibold" style={{ color: accent.main }}>{sn.title}</h3>
+                      <div className="mt-1 mb-3 h-1 w-12 rounded-full" style={{ backgroundColor: accent.main }} />
                       <div className="flex flex-wrap gap-3 text-sm text-muted">
                         {sn.presenter && <span>المقدّم: {sn.presenter}</span>}
                         {sn.time_label && <span dir="ltr">{sn.time_label}</span>}

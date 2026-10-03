@@ -98,9 +98,11 @@ async function toJpegSized(
 }
 
 async function buildAssets(data: MagazineData): Promise<PdfAssets> {
-  const [fontRegular, fontSemiBold, logoNauss, logoMoi, logoNaussWhite, logoStar] = await Promise.all([
-    fileDataUrl('fonts/Cairo.ttf', 'font/ttf'),
-    fileDataUrl('fonts/Cairo.ttf', 'font/ttf'),
+  const [fontRegular, fontSemiBold, fontLatinRegular, fontLatinSemiBold, logoNauss, logoMoi, logoNaussWhite, logoStar] = await Promise.all([
+    fileDataUrl('fonts/ElMessiri-PDF-Regular.ttf', 'font/ttf'),
+    fileDataUrl('fonts/ElMessiri-PDF-SemiBold.ttf', 'font/ttf'),
+    fileDataUrl('fonts/NotoSans-LatinExt-400.woff', 'font/woff'),
+    fileDataUrl('fonts/NotoSans-LatinExt-600.woff', 'font/woff'),
     fileDataUrl('logo-nauss.png', 'image/png'),
     fileDataUrl('logo-moi.png', 'image/png'),
     fileDataUrl('logo-nauss-white.png', 'image/png'),
@@ -142,6 +144,8 @@ async function buildAssets(data: MagazineData): Promise<PdfAssets> {
   return {
     fontRegular,
     fontSemiBold,
+    fontLatinRegular,
+    fontLatinSemiBold,
     logoNauss,
     logoMoi,
     logoNaussWhite,
