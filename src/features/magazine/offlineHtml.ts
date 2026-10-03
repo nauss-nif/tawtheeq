@@ -388,11 +388,13 @@ ${pagesHtml}
   var root=document.getElementById('root'),holder=document.getElementById('holder'),scaler=document.getElementById('scaler');
   var tpl=document.getElementById('pages'),prev=document.getElementById('prev'),next=document.getElementById('next'),counter=document.getElementById('counter');
   var pf=null,mode=null;
+  function ar(n){return String(n).replace(/[0-9]/g,function(d){return '٠١٢٣٤٥٦٧٨٩'[+d];});}
   function update(){
     if(!pf)return;
     var i=pf.getCurrentPageIndex(),n=pf.getPageCount();
-    counter.textContent=(i+1)+' / '+n;
-    prev.disabled=i===0;next.disabled=i>=n-1;
+    // الصفحات معكوسة (اتجاه عربي): رقم القراءة = n - i
+    counter.textContent=ar(n-i)+' / '+ar(n);
+    prev.disabled=i>=n-1;next.disabled=i===0;
   }
   function layout(){
     var single=window.innerWidth<768,s=single?PORT:LAND,pages=single?1:2;
@@ -402,7 +404,7 @@ ${pagesHtml}
     var m=single?'p':'l';
     if(m===mode)return;
     mode=m;
-    var at=pf?pf.getCurrentPageIndex():0;
+    var at=pf?pf.getCurrentPageIndex():-1;
     if(pf){try{pf.destroy();}catch(e){}pf=null;}
     scaler.innerHTML='';
     root.classList.toggle('portrait',single);
@@ -412,16 +414,19 @@ ${pagesHtml}
     var imgs=book.querySelectorAll('img[data-k]');
     for(var j=0;j<imgs.length;j++){var src=ASSETS[imgs[j].getAttribute('data-k')];if(src)imgs[j].src=src;}
     scaler.appendChild(book);
+    // page-flip لا يدعم RTL: نمرّر الصفحات معكوسة ونبدأ من آخرها فيُقلَّب الكتاب من اليسار لليمين
+    var pages=Array.prototype.slice.call(book.querySelectorAll('.flip-page')).reverse();
+    if(at<0)at=pages.length-1;
     pf=new St.PageFlip(book,{width:s.w,height:s.h,size:'fixed',showCover:true,usePortrait:single,mobileScrollSupport:true,useMouseEvents:true,swipeDistance:20,drawShadow:true,maxShadowOpacity:.4,startPage:at});
-    pf.loadFromHTML(book.querySelectorAll('.flip-page'));
+    pf.loadFromHTML(pages);
     pf.on('flip',update);
     update();
   }
-  prev.onclick=function(){pf&&pf.flipPrev();};
-  next.onclick=function(){pf&&pf.flipNext();};
+  prev.onclick=function(){pf&&pf.flipNext();};
+  next.onclick=function(){pf&&pf.flipPrev();};
   window.addEventListener('keydown',function(e){
     if(!pf)return;
-    if(e.key==='ArrowRight')pf.flipPrev();else if(e.key==='ArrowLeft')pf.flipNext();
+    if(e.key==='ArrowRight')pf.flipNext();else if(e.key==='ArrowLeft')pf.flipPrev();
   });
   var fs=document.getElementById('fs');
   if(!document.documentElement.requestFullscreen){fs.style.display='none';}

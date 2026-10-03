@@ -117,7 +117,7 @@ export function MediaGrid({
           <div className="relative aspect-square bg-background">
             {m.thumbnail_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={m.thumbnail_url} alt={m.caption ?? ''} className="size-full object-cover" />
+              <img src={m.thumbnail_url} alt={m.caption ?? ''} className="size-full object-contain" />
             ) : (
               <div className="flex size-full items-center justify-center text-muted/40">
                 {m.type === 'video' ? <Film className="size-8" /> : <Loader2 className="size-6 animate-spin" />}

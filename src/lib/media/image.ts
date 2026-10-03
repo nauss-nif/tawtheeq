@@ -61,9 +61,10 @@ export async function processImage(input: Buffer): Promise<ProcessedImage> {
     .webp({ quality: 78 })
     .toBuffer();
 
+  // المعاينة المصغّرة تحفظ الصورة كاملة دون قصّ (القصّ المربع كان يُخفي الوجوه في الصور الطولية)
   const thumb = await base
     .clone()
-    .resize({ width: 400, height: 400, fit: 'cover', position: 'attention' })
+    .resize({ width: 480, height: 480, fit: 'inside', withoutEnlargement: true })
     .webp({ quality: 72 })
     .toBuffer();
 

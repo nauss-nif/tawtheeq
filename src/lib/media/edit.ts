@@ -85,7 +85,8 @@ export async function reprocessImage(input: Buffer, edit: ImageEdit): Promise<Ed
     .toBuffer();
 
   const thumb = await tuned(
-    sharp(buf, { failOn: 'none' }).resize({ width: 400, height: 400, fit: 'cover', position: 'attention' }),
+    // الصورة كاملة دون قصّ مربع، حتى تطابق المعاينة ما يظهر في المجلة
+    sharp(buf, { failOn: 'none' }).resize({ width: 480, height: 480, fit: 'inside', withoutEnlargement: true }),
   )
     .webp({ quality: 72 })
     .toBuffer();

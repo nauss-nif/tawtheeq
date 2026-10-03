@@ -71,7 +71,9 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
       const el = containerRef.current;
       // الاستيراد غير متزامن: قد يُفكَّك المكوّن قبل الوصول هنا (StrictMode يركّب مرتين)
       if (cancelled || !el) return;
-      const pages = Array.from(el.querySelectorAll<HTMLElement>('.flip-page'));
+      // اتجاه عربي: page-flip لا يدعم RTL، فنمرّر الصفحات معكوسة ونبدأ من آخرها،
+      // فيقع الغلاف وحده يسارًا وتُقلَّب الصفحات من اليسار إلى اليمين كالكتاب العربي
+      const pages = Array.from(el.querySelectorAll<HTMLElement>('.flip-page')).reverse();
       if (pages.length === 0) return;
 
       const instance = new PageFlip(el, {
@@ -81,6 +83,7 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
         showCover: true,
         usePortrait: singlePage, // صفحة واحدة على الجوال
         mobileScrollSupport: true,
+        startPage: pages.length - 1,
         useMouseEvents: true,
         swipeDistance: 20, // لمسة أقصر تكفي للتقليب على الجوال
         drawShadow: true,
@@ -112,8 +115,9 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
   useEffect(() => {
     if (!flip) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowRight') flip.flipPrev();
-      else if (e.key === 'ArrowLeft') flip.flipNext();
+      // الترتيب معكوس: التقدّم في القراءة = الرجوع في فهرس المكتبة
+      if (e.key === 'ArrowRight') flip.flipNext();
+      else if (e.key === 'ArrowLeft') flip.flipPrev();
       else if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKey);
@@ -355,20 +359,20 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
       <div className="mt-3 flex items-center gap-4 text-white/85">
         <button
           type="button"
-          onClick={() => flip?.flipPrev()}
-          disabled={!flip || pageIndex === 0}
+          onClick={() => flip?.flipNext()}
+          disabled={!flip || (pageCount > 0 && pageIndex >= pageCount - 1)}
           aria-label="الصفحة السابقة"
           className="inline-flex size-10 items-center justify-center rounded-full bg-white/15 transition hover:bg-white/25 disabled:opacity-30"
         >
           <ChevronRight className="size-5" />
         </button>
         <span className="min-w-24 text-center text-xs tabular-nums text-white/70">
-          {pageCount > 0 ? `${pageIndex + 1} / ${pageCount}` : '...'}
+          {pageCount > 0 ? `${toArabic(pageCount - pageIndex)} / ${toArabic(pageCount)}` : '...'}
         </span>
         <button
           type="button"
-          onClick={() => flip?.flipNext()}
-          disabled={!flip || (pageCount > 0 && pageIndex >= pageCount - 1)}
+          onClick={() => flip?.flipPrev()}
+          disabled={!flip || pageIndex === 0}
           aria-label="الصفحة التالية"
           className="inline-flex size-10 items-center justify-center rounded-full bg-white/15 transition hover:bg-white/25 disabled:opacity-30"
         >
