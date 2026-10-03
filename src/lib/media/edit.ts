@@ -1,4 +1,5 @@
 import sharp from 'sharp';
+import { getImageFilter } from './filters';
 
 /** تعديلات المستخدم على صورة مرفوعة (قص/تدوير/تحسين) */
 export interface ImageEdit {
@@ -9,6 +10,8 @@ export interface ImageEdit {
   brightness?: number; // 1 = بلا تغيير
   contrast?: number;
   saturation?: number;
+  /** معرّف فلتر جاهز من IMAGE_FILTERS (يُطبَّق قبل التباين) */
+  filter?: string;
 }
 
 export interface EditedImage {
@@ -52,15 +55,20 @@ export async function reprocessImage(input: Buffer, edit: ImageEdit): Promise<Ed
     }
   }
 
-  const brightness = clamp(edit.brightness ?? 1, 0.5, 1.8);
-  const saturation = clamp(edit.saturation ?? 1, 0, 2);
-  const contrast = clamp(edit.contrast ?? 1, 0.5, 2);
+  // قيم المنزلقات مضروبة في مضاعفات الفلتر المختار
+  const fx = getImageFilter(edit.filter);
+  const brightness = clamp((edit.brightness ?? 1) * fx.brightness, 0.4, 2);
+  const saturation = clamp((edit.saturation ?? 1) * fx.saturation, 0, 2.4);
+  const contrast = clamp((edit.contrast ?? 1) * fx.contrast, 0.4, 2.4);
+  // التباين حول الرمادي المتوسط مع إزاحة الفلتر لكل قناة: c·(x + o − ½) + ½
+  const offsets = fx.offset.map((o) => contrast * o * 255 + 128 * (1 - contrast));
 
-  const tuned = (img: sharp.Sharp) =>
-    img
-      .modulate({ brightness, saturation })
-      .linear(contrast, 128 * (1 - contrast)) // تباين حول الرمادي المتوسط
-      .sharpen({ sigma: 0.6 });
+  // الترتيب نفسه في معاينة المتصفح: سطوع وتشبّع ← مصفوفة الفلتر ← تباين
+  const tuned = (img: sharp.Sharp) => {
+    let p = img.modulate({ brightness, saturation });
+    if (fx.id !== 'none') p = p.removeAlpha().recomb(fx.matrix as sharp.Matrix3x3);
+    return p.linear([contrast, contrast, contrast], offsets).sharpen({ sigma: 0.6 });
+  };
 
   const fullPipe = tuned(
     sharp(buf, { failOn: 'none' }).resize({
