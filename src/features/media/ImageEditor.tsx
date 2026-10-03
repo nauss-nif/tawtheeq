@@ -15,6 +15,7 @@ const ASPECTS: { label: string; value: number | null }[] = [
   { label: '٤:٣', value: 4 / 3 },
   { label: '١٦:٩', value: 16 / 9 },
   { label: '٣:٤', value: 3 / 4 },
+  { label: '٩:١٦', value: 9 / 16 },
 ];
 
 /**
@@ -100,8 +101,15 @@ export function ImageEditor({
 
           if (aspect) {
             // نثبّت النسبة اعتمادًا على العرض (بوحدات البكسل المعروضة)
-            const pxW = w * dispW;
-            h = Math.min(pxW / aspect / dispH, 1 - y);
+            const maxH = mode === 'nw' || mode === 'ne' ? bottom : 1 - y;
+            h = (w * dispW) / aspect / dispH;
+            if (h > maxH) {
+              // بلغ الارتفاع حافة الصورة: نصغّر العرض بدل كسر النسبة (مهم للنسب الطولية مثل ٩:١٦)
+              h = maxH;
+              const newW = (h * dispH * aspect) / dispW;
+              if (mode === 'nw' || mode === 'sw') x = right - newW;
+              w = newW;
+            }
             if (mode === 'nw' || mode === 'ne') y = Math.max(0, bottom - h);
           }
           next = { x, y, w, h };
@@ -119,12 +127,21 @@ export function ImageEditor({
     [crop, aspect, dispW, dispH],
   );
 
+  /** أكبر مستطيل بالنسبة المختارة يتسع داخل الصورة، متمركز حول منتصف القص الحالي */
   const applyAspect = (a: number | null) => {
     setAspect(a);
     if (!a) return;
-    const pxW = crop.w * dispW;
-    const h = Math.min(pxW / a / dispH, 1 - crop.y);
-    setCrop({ ...crop, h });
+    const imgRatio = dispW / dispH;
+    const w = a >= imgRatio ? 1 : a / imgRatio;
+    const h = a >= imgRatio ? imgRatio / a : 1;
+    const cx = crop.x + crop.w / 2;
+    const cy = crop.y + crop.h / 2;
+    setCrop({
+      x: Math.min(Math.max(0, cx - w / 2), 1 - w),
+      y: Math.min(Math.max(0, cy - h / 2), 1 - h),
+      w,
+      h,
+    });
   };
 
   const reset = () => {
@@ -242,7 +259,7 @@ export function ImageEditor({
             </button>
           ))}
           <button
-            onClick={() => { setRot((r) => (r + 90) % 360); setCrop(FULL); }}
+            onClick={() => { setRot((r) => (r + 90) % 360); setCrop(FULL); setAspect(null); }}
             className="inline-flex items-center gap-1.5 rounded-xl bg-muted/10 px-3 py-1.5 text-xs text-primary hover:bg-muted/20"
           >
             <RotateCw className="size-3.5" /> تدوير
