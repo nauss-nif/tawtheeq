@@ -128,18 +128,19 @@ async function buildAssets(data: MagazineData): Promise<PdfAssets> {
   const aspectById = planImageAspects(data.sessions, data.images);
 
   // نحوّل الصور (لتفادي ملفات ضخمة نكتفي بحدٍّ معقول): قصّ ذكي + تحسين احترافي
-  const gallery = data.images.slice(0, 40);
+  // حدّ أعلى معقول لحجم الملف ووقت المعالجة (كان ٤٠ فتسقط صور المجلات الأكبر من الـPDF)
+  const gallery = data.images.slice(0, 80);
   const images = (
     await Promise.all(
       gallery.map(async (m) => {
         const url = m.processed_url ?? m.thumbnail_url ?? '';
         const aspect = aspectById.get(m.id);
         const r = aspect ? await toSmartJpeg(url, aspect) : await toJpegSized(url, 1200);
-        return r ? { src: r.src, caption: m.caption, sessionId: m.session_id, w: r.w, h: r.h } : null;
+        return r ? { id: m.id, src: r.src, caption: m.caption, sessionId: m.session_id, w: r.w, h: r.h, width: m.width, height: m.height } : null;
       }),
     )
   ).filter(
-    (x): x is { src: string; caption: string | null; sessionId: string | null; w: number; h: number } => x !== null,
+    (x): x is NonNullable<typeof x> => x !== null,
   );
 
   return {

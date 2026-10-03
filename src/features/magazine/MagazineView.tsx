@@ -9,6 +9,7 @@ import type { MagazineData } from './data';
 import { Flipbook } from './Flipbook';
 import { sessionAccent, sessionOrdinal } from './accents';
 import { STAR_PATH, STAR_VIEWBOX } from './brandStar';
+import { groupByOrientation, orientationOf } from './imageLayout';
 
 const NAV = [
   { id: 'intro', label: 'تعريف' },
@@ -189,6 +190,15 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
               {sessions.map((sn, i) => {
                 const sImgs = bySession.get(sn.id) ?? [];
                 const accent = sessionAccent(i);
+                const mainImg = sImgs[0];
+                // بقية الصور مجمّعة حسب الاتجاه: شبكة للأفقية وأخرى للطولية بنسب متطابقة
+                const rest = groupByOrientation(sImgs.slice(1));
+                const restGroups = rest.reduce<{ o: 'portrait' | 'landscape'; items: typeof rest }[]>((acc, m) => {
+                  const o = orientationOf(m);
+                  if (acc.length && acc[acc.length - 1].o === o) acc[acc.length - 1].items.push(m);
+                  else acc.push({ o, items: [m] });
+                  return acc;
+                }, []);
                 return (
                   <motion.article
                     key={sn.id}
@@ -196,7 +206,7 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
                     whileInView={{ opacity: 1, y: 0 }}
                     viewport={{ once: true, margin: '-40px' }}
                     transition={{ duration: 0.45 }}
-                    className="relative grid gap-6 overflow-hidden rounded-3xl border border-secondary/30 border-r-4 bg-surface p-6 shadow-soft md:grid-cols-2"
+                    className="relative grid gap-6 overflow-hidden rounded-3xl border border-secondary/30 border-r-4 bg-surface p-6 shadow-soft md:grid-cols-5"
                     style={{ borderRightColor: accent.main, background: `radial-gradient(70% 90% at 100% 0%, ${accent.tint} 0%, #fff 55%)` }}
                   >
                     {/* نجمة الجامعة بلون المحور تخرج من زاوية البطاقة */}
@@ -204,7 +214,7 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
                       <path d={STAR_PATH} fill={accent.main} fillOpacity={0.07} fillRule="evenodd" />
                     </svg>
                     {/* النص */}
-                    <div className={`relative ${sImgs.length === 0 ? 'md:col-span-2' : ''}`}>
+                    <div className={`relative ${mainImg ? 'md:col-span-2' : 'md:col-span-5'}`}>
                       <span className="flex items-center gap-2 text-xs font-bold tracking-wide" style={{ color: accent.main }}>
                         <span
                           className="flex h-7 w-9 items-center justify-center rounded-l-lg rounded-r-sm text-[13px] text-white shadow-sm"
@@ -228,18 +238,53 @@ export function MagazineView({ data, siteUrl }: { data: MagazineData; siteUrl: s
                       )}
                     </div>
 
-                    {/* كل صور المحور (قابلة للتكبير) */}
-                    {sImgs.length > 0 && (
-                      <div className={`relative grid content-start gap-3 ${sImgs.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                        {sImgs.map((m) => (
-                          // eslint-disable-next-line @next/next/no-img-element
-                          <img
-                            key={m.id}
-                            src={m.processed_url ?? m.thumbnail_url ?? ''}
-                            alt={m.caption ?? sn.title}
-                            onClick={() => setLightbox(images.findIndex((x) => x.id === m.id))}
-                            className="h-auto w-full cursor-zoom-in rounded-2xl border border-secondary/30 object-cover transition-transform duration-300 hover:-translate-y-0.5"
-                          />
+                    {/* الصورة الرئيسية للمحور بجوار النص */}
+                    {mainImg && (
+                      <button
+                        type="button"
+                        onClick={() => setLightbox(images.findIndex((x) => x.id === mainImg.id))}
+                        className="relative flex cursor-zoom-in items-center justify-center overflow-hidden rounded-2xl border border-secondary/30 bg-background md:col-span-3"
+                      >
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={mainImg.processed_url ?? mainImg.thumbnail_url ?? ''}
+                          alt={mainImg.caption ?? sn.title}
+                          className={`w-full transition-transform duration-500 hover:scale-[1.02] ${orientationOf(mainImg) === 'portrait' ? 'max-h-[460px] object-contain' : 'aspect-[4/3] object-cover'}`}
+                        />
+                      </button>
+                    )}
+
+                    {/* بقية الصور: شبكة لكل اتجاه بنسب متطابقة فتبدو مرتبة */}
+                    {restGroups.length > 0 && (
+                      <div className="relative flex flex-col gap-3 md:col-span-5">
+                        {restGroups.map((g, gi) => (
+                          <div
+                            key={gi}
+                            className={`grid gap-3 ${
+                              g.o === 'portrait'
+                                ? 'grid-cols-2 sm:grid-cols-3 lg:grid-cols-4'
+                                : g.items.length >= 3
+                                  ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
+                                  : 'grid-cols-1 sm:grid-cols-2'
+                            }`}
+                          >
+                            {g.items.map((m) => (
+                              <button
+                                key={m.id}
+                                type="button"
+                                onClick={() => setLightbox(images.findIndex((x) => x.id === m.id))}
+                                className="group/img overflow-hidden rounded-2xl border border-secondary/30 bg-background"
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={m.processed_url ?? m.thumbnail_url ?? ''}
+                                  alt={m.caption ?? sn.title}
+                                  loading="lazy"
+                                  className={`w-full cursor-zoom-in object-cover transition-transform duration-500 group-hover/img:scale-105 ${g.o === 'portrait' ? 'aspect-[3/4]' : 'aspect-[4/3]'}`}
+                                />
+                              </button>
+                            ))}
+                          </div>
                         ))}
                       </div>
                     )}

@@ -60,6 +60,11 @@ export type Media = {
   sharepoint_url: string | null;
   is_low_quality: boolean;
   session_id: string | null;
+  /** أبعاد الصورة المعروضة (processed) بالبكسل */
+  width: number | null;
+  height: number | null;
+  /** آخر إعدادات محرّر الصور (انظر ImageEditParams) */
+  edit_params: Record<string, unknown> | null;
   created_at: string;
 }
 

@@ -18,6 +18,21 @@ const ASPECTS: { label: string; value: number | null }[] = [
   { label: '٣:٤', value: 3 / 4 },
   { label: '٩:١٦', value: 9 / 16 },
 ];
+/** إعدادات المحرّر المحفوظة مع الصورة (media.edit_params) ليُفتح عليها لاحقًا */
+interface EditorParams {
+  aspect: number | null;
+  zoom: number;
+  off: { x: number; y: number };
+  crop: Rect;
+  rotate: number;
+  filter: string;
+  brightness: number;
+  contrast: number;
+  saturation: number;
+}
+
+const num = (v: unknown, fallback: number) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback);
+
 const MIN_ZOOM = 1;
 const MAX_ZOOM = 4;
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
@@ -56,15 +71,51 @@ export function ImageEditor({
   const [contrast, setContrast] = useState(1);
   const [saturation, setSaturation] = useState(1);
   const [saving, setSaving] = useState(false);
+  // صورة المصدر: نسخة الأصل قبل أي تعديل (يحددها الخادم)؛ null أثناء التحميل
+  const [source, setSource] = useState<string | null>(null);
+
+  // نفتح على الأصل وآخر إعدادات محفوظة؛ عرض الصورة المعدّلة سابقًا مع تطبيق القص على الأصل
+  // كان يُطبّق الإحداثيات على منطقة مختلفة، ويُفقد القص السابق عند الحفظ مجددًا
+  useEffect(() => {
+    let cancelled = false;
+    // مهلة: إن تأخر الخادم نفتح على الصورة الحالية بدل تعليق المحرّر
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), 10000);
+    fetch(`/api/courses/${courseId}/media/${mediaId}/edit`, { signal: ctrl.signal })
+      .then((r) => (r.ok ? r.json() : Promise.reject(new Error(String(r.status)))))
+      .then((d: { source: string | null; params: Partial<EditorParams> | null }) => {
+        if (cancelled) return;
+        const p = d.params;
+        if (p) {
+          const c = p.crop;
+          setRot([0, 90, 180, 270].includes(num(p.rotate, 0)) ? num(p.rotate, 0) : 0);
+          setAspect(typeof p.aspect === 'number' && p.aspect > 0 ? p.aspect : null);
+          setZoom(clamp(num(p.zoom, 1), MIN_ZOOM, MAX_ZOOM));
+          setOff({ x: num(p.off?.x, 0), y: num(p.off?.y, 0) });
+          if (c) setCrop({ x: num(c.x, 0), y: num(c.y, 0), w: num(c.w, 1), h: num(c.h, 1) });
+          setFilterId(typeof p.filter === 'string' ? getImageFilter(p.filter).id : 'none');
+          setBrightness(num(p.brightness, 1));
+          setContrast(num(p.contrast, 1));
+          setSaturation(num(p.saturation, 1));
+        }
+        setSource(d.source ?? src);
+      })
+      .catch(() => {
+        if (!cancelled) setSource(src);
+      })
+      .finally(() => clearTimeout(timer));
+    return () => { cancelled = true; clearTimeout(timer); ctrl.abort(); };
+  }, [courseId, mediaId, src]);
 
   // أبعاد الصورة الأصلية: نقيسها بتحميل مستقل لأن حدث onLoad لعنصر الصورة قد يسبق تهيئة React
   // حين تكون الصورة في ذاكرة المتصفح، فتبقى الأبعاد مجهولة وتُعرض الصورة مشوّهة بنسبة افتراضية
   useEffect(() => {
+    if (!source) return;
     const probe = new Image();
     probe.onload = () => setNat({ w: probe.naturalWidth, h: probe.naturalHeight });
-    probe.src = src;
+    probe.src = source;
     return () => { probe.onload = null; };
-  }, [src]);
+  }, [source]);
 
   useEffect(() => {
     const fit = () =>
@@ -209,7 +260,7 @@ export function ImageEditor({
     };
     el.addEventListener('wheel', onWheel, { passive: false });
     return () => el.removeEventListener('wheel', onWheel);
-  }, [aspect]);
+  }, [aspect, source, nat]);
 
   const applyAspect = (a: number | null) => {
     setAspect(a);
@@ -252,6 +303,17 @@ export function ImageEditor({
           contrast,
           saturation,
           filter: filterId,
+          params: {
+            aspect,
+            zoom,
+            off: { x: ox / (frameW || 1), y: oy / (frameH || 1) },
+            crop,
+            rotate: rot,
+            filter: filterId,
+            brightness,
+            contrast,
+            saturation,
+          } satisfies EditorParams,
         }),
       });
       const json = await res.json();
@@ -282,7 +344,7 @@ export function ImageEditor({
   const imgEl = (w: number, h: number, extra: string, filter: string) => (
     // eslint-disable-next-line @next/next/no-img-element
     <img
-      src={src}
+      src={source ?? ''}
       alt=""
       draggable={false}
       style={{
@@ -324,7 +386,11 @@ export function ImageEditor({
 
         {/* مساحة المعاينة والقص */}
         <div className="flex justify-center rounded-2xl bg-[#1f2422] p-3">
-          {aspect ? (
+          {!source || !nat ? (
+            <div className="flex items-center justify-center gap-2 text-sm text-white/70" style={{ width: box.maxW, height: box.maxH }}>
+              <Loader2 className="size-5 animate-spin" /> جارٍ تحميل الصورة الأصلية…
+            </div>
+          ) : aspect ? (
             /* وضع الإطار: الصورة تُحرَّك وتُكبَّر تحت إطار ثابت بالمقاس */
             <div
               ref={frameRef}
@@ -419,10 +485,10 @@ export function ImageEditor({
         {/* الفلاتر الجاهزة مع معاينة مصغّرة لكل فلتر */}
         <div className="mt-4">
           <p className="mb-2 flex items-center gap-1.5 text-xs font-medium text-primary">
-            <Sparkles className="size-3.5 text-secondary" /> فلاتر البورتريه
+            <Sparkles className="size-3.5 text-secondary" /> فلاتر تحسين الصور
           </p>
           <div className="flex gap-2 overflow-x-auto pb-1">
-            {IMAGE_FILTERS.map((f) => (
+            {source && IMAGE_FILTERS.map((f) => (
               <button
                 key={f.id}
                 onClick={() => setFilterId(f.id)}
@@ -434,7 +500,7 @@ export function ImageEditor({
                 <span className="block size-[72px] overflow-hidden rounded-xl bg-background">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
-                    src={src}
+                    src={source ?? ''}
                     alt=""
                     draggable={false}
                     className="size-full object-cover"
@@ -458,7 +524,7 @@ export function ImageEditor({
           <button onClick={onClose} className="rounded-2xl px-4 py-2 text-sm text-muted hover:bg-muted/10">
             إلغاء
           </button>
-          <Button onClick={save} disabled={saving}>
+          <Button onClick={save} disabled={saving || !source || !nat}>
             {saving ? <Loader2 className="size-4 animate-spin" /> : null} حفظ التعديل
           </Button>
         </div>

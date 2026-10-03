@@ -5,6 +5,7 @@ import { formatArabicDate } from '@/lib/utils';
 import type { MagazineData } from './data';
 import { GOLD, sessionAccent, sessionOrdinal, tabTopRatio, type SessionAccent } from './accents';
 import { STAR_PATH, STAR_VIEWBOX } from './brandStar';
+import { packImagePages, sessionPageCount } from './imageLayout';
 
 /**
  * مجلة الـFlipbook كملف HTML واحد قائم بذاته يعمل دون اتصال بالإنترنت:
@@ -110,12 +111,15 @@ function magPage(o: PageOpts): string {
 </div></div>`;
 }
 
-function imageBody(key: string | null, caption: string | null, sectionLabel?: string): string {
-  return `<div class="img-page${sectionLabel ? ' labeled' : ''}${caption ? ' captioned' : ''}">${
+/** صفحة صور: أفقية واحدة، أو طوليتان جنبًا إلى جنب (keys: مفاتيح الصور في خريطة الأصول) */
+function imageBody(items: { key: string | null; caption: string | null }[], sectionLabel?: string): string {
+  const captions = items.map((x) => x.caption).filter(Boolean) as string[];
+  const pair = items.length > 1;
+  return `<div class="img-page${sectionLabel ? ' labeled' : ''}${captions.length ? ' captioned' : ''}">${
     sectionLabel ? `<div class="section"><i></i><h2>${esc(sectionLabel)}</h2></div>` : ''
-  }<div class="img-wrap"><div class="aframe sm"><div class="frame-img">${img(key, 'photo', caption ?? '')}</div></div></div>${
-    caption ? `<div class="caption"><p>${esc(caption)}</p></div>` : ''
-  }</div>`;
+  }<div class="img-wrap${pair ? ' pair' : ''}">${items
+    .map((x) => `<div class="cell"><div class="aframe sm"><div class="frame-img">${img(x.key, 'photo', x.caption ?? '')}</div></div></div>`)
+    .join('')}</div>${captions.length ? `<div class="caption"><p>${esc(captions.join(' · '))}</p></div>` : ''}</div>`;
 }
 
 function ornament(): string {
@@ -213,7 +217,7 @@ ${coordinator ? `<div class="coord">${img(avatarKey, 'avatar', coordinator.full_
     let at = pageNo + 1;
     const starts = sessions.map((s) => {
       const first = at + 1;
-      at += Math.max(1, (bySession.get(s.id) ?? []).length);
+      at += sessionPageCount(bySession.get(s.id) ?? []);
       return first;
     });
     const dense = sessions.length > 10;
@@ -249,16 +253,19 @@ ${s.description ? `<p class="desc">${esc(s.description)}</p>` : '<p class="desc 
 ${mainKey ? `<div class="s-img"><div class="aframe"><div class="frame-img">${img(mainKey, 'photo', main!.caption ?? s.title)}</div></div></div>` : ''}
 </div>`,
     });
-    sImgs.slice(1).forEach((m) => {
-      page({ heading: s.title, pageNo: ++pageNo, accent, tab: i, body: imageBody(imageKey.get(m.id) ?? null, m.caption, s.title) });
+    // بقية الصور مرتبة حسب الاتجاه: صورتان طوليتان في صفحة، والأفقية صفحة كاملة
+    packImagePages(sImgs.slice(1)).forEach((slot) => {
+      const items = slot.images.map((m) => ({ key: imageKey.get(m.id) ?? null, caption: m.caption }));
+      page({ heading: s.title, pageNo: ++pageNo, accent, tab: i, body: imageBody(items, s.title) });
     });
   });
 
-  unassigned.forEach((m, idx) => {
+  packImagePages(unassigned).forEach((slot, idx) => {
+    const items = slot.images.map((m) => ({ key: imageKey.get(m.id) ?? null, caption: m.caption }));
     page({
       heading: 'صور من الدورة',
       pageNo: ++pageNo,
-      body: imageBody(imageKey.get(m.id) ?? null, m.caption, idx === 0 ? 'صور من الدورة' : undefined),
+      body: imageBody(items, idx === 0 ? 'صور من الدورة' : undefined),
     });
   });
 
@@ -408,6 +415,9 @@ body{font-family:'Cairo',system-ui,sans-serif;background:#0a3d35;color:#2a302d;o
 .section i{height:3px;width:24px;flex-shrink:0;border-radius:9999px;background:var(--ac)}
 .section h2{overflow:hidden;white-space:nowrap;text-overflow:ellipsis;font-size:16px;font-weight:600;color:var(--acd)}
 .img-wrap{display:flex;min-height:0;flex:1;align-items:center;justify-content:center;padding-bottom:12px}
+.img-wrap .cell{display:flex;justify-content:center}
+.img-wrap.pair{gap:28px}
+.img-wrap.pair .cell{flex:1;min-width:0}
 .img-page .photo{max-height:420px}
 .img-page.labeled .photo{max-height:380px}
 .img-page.captioned .photo{max-height:390px}

@@ -7,6 +7,7 @@ import { formatArabicDate } from '@/lib/utils';
 import type { MagazineData } from './data';
 import { GOLD, sessionAccent, sessionOrdinal, tabTopRatio, type SessionAccent } from './accents';
 import { STAR_H, STAR_PATH, STAR_VIEWBOX, STAR_W } from './brandStar';
+import { packImagePages, sessionPageCount, type ImageSlot } from './imageLayout';
 
 /**
  * وضع Flipbook: مجلة أفقية أنيقة. صورة واحدة كبيرة لكل صفحة (تناسب الصور الأفقية)،
@@ -190,7 +191,7 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
     let at = pageNo + 1; // صفحة المحتويات نفسها
     const starts = shownSessions.map((s) => {
       const first = at + 1;
-      at += Math.max(1, (bySession.get(s.id) ?? []).length);
+      at += sessionPageCount(bySession.get(s.id) ?? []);
       return first;
     });
     interior.push(
@@ -255,16 +256,17 @@ export function Flipbook({ data, onClose }: { data: MagazineData; onClose: () =>
     );
 
     // بقية صور المحور: صفحة كبيرة لكل صورة، عنوانها اسم المحور فقط
-    sImgs.slice(1).forEach((m) => {
-      interior.push(imagePage(m, s.title, course.title, ++pageNo, showMoi, sideOf(interior.length), singlePage, s.title, accent, i));
+    // بقية الصور مرتبة حسب الاتجاه: صورتان طوليتان في صفحة، والأفقية صفحة كاملة
+    packImagePages(sImgs.slice(1)).forEach((slot) => {
+      interior.push(imagePage(slot, s.title, course.title, ++pageNo, showMoi, sideOf(interior.length), singlePage, s.title, accent, i));
     });
   });
 
   // الصور غير المرتبطة بمحور: صفحة كبيرة لكل صورة تحت عنوان عام
   if (unassigned.length > 0) {
-    unassigned.forEach((m, idx) => {
+    packImagePages(unassigned).forEach((slot, idx) => {
       interior.push(
-        imagePage(m, 'صور من الدورة', course.title, ++pageNo, showMoi, sideOf(interior.length), singlePage, idx === 0 ? 'صور من الدورة' : undefined),
+        imagePage(slot, 'صور من الدورة', course.title, ++pageNo, showMoi, sideOf(interior.length), singlePage, idx === 0 ? 'صور من الدورة' : undefined),
       );
     });
   }
@@ -464,9 +466,11 @@ function AccentFrame({ accent, side, offset, children }: { accent: SessionAccent
   );
 }
 
-/** صفحة صورة كبيرة مع عنوان قسم اختياري */
+type PageImage = { id: string; processed_url: string | null; thumbnail_url: string | null; caption: string | null; width: number | null; height: number | null };
+
+/** صفحة صور: صورة أفقية واحدة كبيرة، أو صورتان طوليتان جنبًا إلى جنب، مع عنوان قسم اختياري */
 function imagePage(
-  m: { id: string; processed_url: string | null; thumbnail_url: string | null; caption: string | null },
+  slot: ImageSlot<PageImage>,
   heading: string,
   courseTitle: string,
   pageNo: number,
@@ -478,10 +482,12 @@ function imagePage(
   tab?: number,
 ) {
   const ac = accent ?? GOLD;
+  const captions = slot.images.map((m) => m.caption).filter(Boolean) as string[];
   // أقصى ارتفاع للصورة داخل مساحة المحتوى (أفقي ٤٤٨ / عمودي ٦٨٨) بعد العنوان والإطار والتعليق
-  const maxH = (singlePage ? 640 : 420) - (sectionLabel ? 40 : 0) - (m.caption ? 30 : 0);
+  const maxH = (singlePage ? 640 : 420) - (sectionLabel ? 40 : 0) - (captions.length ? 30 : 0);
+  const pair = slot.kind === 'pair';
   return (
-    <MagPage key={`img-${m.id}`} side={side} heading={heading} courseTitle={courseTitle} pageNo={pageNo} showMoi={showMoi} accent={accent} tab={tab}>
+    <MagPage key={`img-${slot.images[0].id}`} side={side} heading={heading} courseTitle={courseTitle} pageNo={pageNo} showMoi={showMoi} accent={accent} tab={tab}>
       <div className="flex h-full flex-col">
         {sectionLabel && (
           <div className="mb-3 flex shrink-0 items-center gap-2">
@@ -489,20 +495,24 @@ function imagePage(
             <h2 className="truncate text-[16px] font-semibold" style={{ color: accent?.deep ?? '#0E5C50' }}>{sectionLabel}</h2>
           </div>
         )}
-        <div className="flex min-h-0 flex-1 items-center justify-center pb-3">
-          <AccentFrame accent={ac} side={side} offset={8}>
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={m.processed_url ?? m.thumbnail_url ?? ''}
-              alt={m.caption ?? ''}
-              className="block w-auto max-w-full rounded-lg object-contain"
-              style={{ maxHeight: maxH }}
-            />
-          </AccentFrame>
+        <div className={`flex min-h-0 flex-1 items-center justify-center pb-3 ${pair ? 'gap-7' : ''}`}>
+          {slot.images.map((m) => (
+            <div key={m.id} className={pair ? 'flex min-w-0 flex-1 justify-center' : 'flex justify-center'}>
+              <AccentFrame accent={ac} side={side} offset={8}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={m.processed_url ?? m.thumbnail_url ?? ''}
+                  alt={m.caption ?? ''}
+                  className="block w-auto max-w-full rounded-lg object-contain"
+                  style={{ maxHeight: maxH }}
+                />
+              </AccentFrame>
+            </div>
+          ))}
         </div>
-        {m.caption && (
+        {captions.length > 0 && (
           <div className="shrink-0 text-center">
-            <p className="text-[13px] font-medium text-primary">{m.caption}</p>
+            <p className="text-[13px] font-medium text-primary">{captions.join(' · ')}</p>
           </div>
         )}
       </div>

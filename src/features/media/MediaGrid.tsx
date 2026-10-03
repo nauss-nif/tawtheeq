@@ -11,6 +11,7 @@ import { createClient } from '@/lib/supabase/client';
 import { cn, compressionRatio, formatBytes } from '@/lib/utils';
 import type { Media, Session } from '@/lib/database.types';
 import { sessionAccent, type SessionAccent } from '@/features/magazine/accents';
+import { groupByOrientation } from '@/features/magazine/imageLayout';
 import { ImageEditor } from './ImageEditor';
 import {
   setCoverAction, updateCaptionAction, deleteMediaAction, reorderMediaAction,
@@ -135,9 +136,16 @@ export function MediaGrid({
     title: s.title,
     number: i + 1,
     accent: sessionAccent(i),
-    items: items.filter((m) => m.type === 'image' && m.session_id === s.id),
+    // بترتيب المجلة نفسه: الرئيسية أولًا ثم بقية الصور مجمّعة حسب الاتجاه
+    items: (() => {
+      const list = items.filter((m) => m.type === 'image' && m.session_id === s.id);
+      const mainId = mainBySession.get(s.id)?.id;
+      const main = list.find((m) => m.id === mainId);
+      const rest = list.filter((m) => m.id !== mainId);
+      return main ? [main, ...groupByOrientation(rest)] : groupByOrientation(rest);
+    })(),
   }));
-  const unassigned = items.filter((m) => m.type === 'image' && !(m.session_id && sessionIds.has(m.session_id)));
+  const unassigned = groupByOrientation(items.filter((m) => m.type === 'image' && !(m.session_id && sessionIds.has(m.session_id))));
   const videos = items.filter((m) => m.type === 'video');
   if (unassigned.length > 0 || sessions.length === 0)
     groups.push({ key: 'none', sessionId: null, title: sessions.length ? 'صور غير مرتبطة بمحور' : 'الصور', number: null, accent: UNASSIGNED_ACCENT, items: unassigned });

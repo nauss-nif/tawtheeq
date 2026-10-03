@@ -19,7 +19,8 @@ import type { Course, Session } from '@/lib/database.types';
 import { formatDateRange, toArabicDigits as toArabic } from '@/lib/text';
 import { GOLD, sessionAccent, sessionOrdinal, tabTopRatio, type SessionAccent } from './accents';
 import { STAR_H, STAR_PATH, STAR_VIEWBOX, STAR_W } from './brandStar';
-import { PDF_PAGE, PDF_HERO_BAND, PDF_TITLE_BAND } from './pdfLayout';
+import { PDF_PAGE, PDF_HERO_BAND, PDF_TITLE_BAND, PDF_PAIR_GAP } from './pdfLayout';
+import { orientationOf, packImagePages, sessionPageCount, type ImageSlot } from './imageLayout';
 import { pdfText, splitArabicLatin } from './pdfText';
 
 /**
@@ -43,7 +44,8 @@ export interface PdfAssets {
   showMoi: boolean; // إظهار شعار برامج الشراكات
   coverImage: string | null;
   coordinator: { name: string; jobTitle: string | null; avatar: string | null } | null;
-  images: { src: string; caption: string | null; sessionId: string | null; w: number; h: number }[];
+  /** width/height: أبعاد الصورة الأصلية (لتحديد الاتجاه)، w/h: أبعادها بعد القص الذكي */
+  images: { id: string; src: string; caption: string | null; sessionId: string | null; w: number; h: number; width: number | null; height: number | null }[];
 }
 
 const C = {
@@ -195,7 +197,10 @@ function Footer({ n, courseTitle }: { n: number; courseTitle: string }) {
 }
 
 /** صفحة صورة كبيرة تملأ الصفحة، فوقها عنوان المحور بلونه */
-function bigImagePage(key: string, title: string, src: string, n: number, accent?: SessionAccent, tabIndex?: number) {
+type PdfImage = PdfAssets['images'][number];
+
+/** صفحة صور تحت عنوان المحور: أفقية تملأ الصفحة، أو طوليتان جنبًا إلى جنب، أو طولية متمركزة */
+function bigImagePage(key: string, title: string, slot: ImageSlot<PdfImage>, n: number, accent?: SessionAccent, tabIndex?: number) {
   const color = accent?.main ?? C.primary;
   return (
     <Page key={`bi-${key}`} size={PDF_PAGE} style={{ fontFamily: FONT, backgroundColor: C.bg }}>
@@ -209,8 +214,14 @@ function bigImagePage(key: string, title: string, src: string, n: number, accent
         </View>
       </View>
       <View style={{ position: 'absolute', left: 0, right: 0, top: PDF_TITLE_BAND, height: 4, backgroundColor: color }} />
-      <View style={{ position: 'absolute', left: 0, right: 0, top: PDF_TITLE_BAND + 4, bottom: 0 }}>
-        <Image src={src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      <View style={{ position: 'absolute', left: 0, right: 0, top: PDF_TITLE_BAND + 4, bottom: 0, flexDirection: 'row', justifyContent: 'center', gap: PDF_PAIR_GAP, backgroundColor: accent?.tint ?? C.bg }}>
+        {slot.kind === 'pair' || orientationOf(slot.images[0]) === 'portrait' ? (
+          slot.images.map((im) => (
+            <Image key={im.id} src={im.src} style={{ width: (PDF_PAGE[0] - PDF_PAIR_GAP) / 2, height: '100%', objectFit: 'cover' }} />
+          ))
+        ) : (
+          <Image src={slot.images[0].src} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        )}
       </View>
       {accent && tabIndex !== undefined ? <PdfTab accent={accent} index={tabIndex} /> : null}
       <T style={[s.pageBadge, { backgroundColor: color }]}>{toArabic(n)}</T>
@@ -248,7 +259,7 @@ export function MagazinePDF({
   let at = tocPage;
   const sessionStart = sessions.map((sn) => {
     const first = at + 1;
-    at += Math.max(1, (bySession.get(sn.id) ?? []).length);
+    at += sessionPageCount(bySession.get(sn.id) ?? []);
     return first;
   });
   // نصغّر الأسطر حين تكثر المحاور لتتسع في صفحة واحدة
@@ -414,14 +425,15 @@ export function MagazinePDF({
             <T style={[s.pageBadge, { backgroundColor: ac.main }]}>{toArabic(heroNo)}</T>
           </Page>,
         ];
-        rest.forEach((img, j) => {
-          pages.push(bigImagePage(`${sn.id}-${j}`, sn.title, img.src, ++pageNo, ac, i));
+        // بقية الصور مرتبة حسب الاتجاه: صورتان طوليتان في صفحة، والأفقية صفحة كاملة
+        packImagePages(rest).forEach((slot, j) => {
+          pages.push(bigImagePage(`${sn.id}-${j}`, sn.title, slot, ++pageNo, ac, i));
         });
         return pages;
       })}
 
       {/* ===== الصور غير المرتبطة بمحور ===== */}
-      {unassigned.map((img, j) => bigImagePage(`u-${j}`, 'صور من الدورة', img.src, ++pageNo))}
+      {packImagePages(unassigned).map((slot, j) => bigImagePage(`u-${j}`, 'صور من الدورة', slot, ++pageNo))}
 
       {/* ===== الغلاف الخلفي: شعار الجامعة في المنتصف + عبارة ثابتة أسفل ===== */}
       <Page size={PDF_PAGE} style={s.page}>

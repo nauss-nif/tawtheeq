@@ -2,6 +2,7 @@ import { promises as fs } from 'fs';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { BUCKET_PROCESSED, mediaPath } from '@/lib/storage';
 import { serverEnv } from '@/lib/env';
+import sharp from 'sharp';
 import { processImage } from './image';
 import { processVideo } from './video';
 import { archiveToSharePoint } from './sharepoint';
@@ -45,6 +46,7 @@ export async function processMediaFile(params: {
     let duration: number | null = null;
     let isLowQuality = false;
     let originalBuffer: Buffer;
+    let dims: { width: number | null; height: number | null } = { width: null, height: null };
 
     if (type === 'image') {
       originalBuffer = params.buffer!;
@@ -62,6 +64,9 @@ export async function processMediaFile(params: {
 
       processedUrl = publicHref(supabase, fullPath);
       thumbnailUrl = publicHref(supabase, thumbPath);
+      // أبعاد النسخة المعروضة بعد تصحيح الاتجاه (لترتيب الصور حسب الاتجاه في المجلة)
+      const meta = await sharp(out.full).metadata();
+      dims = { width: meta.width ?? null, height: meta.height ?? null };
     } else {
       originalBuffer = await fs.readFile(params.tempPath!);
       const out = await processVideo(params.tempPath!);
@@ -89,6 +94,7 @@ export async function processMediaFile(params: {
       file_size: compressedSize,
       duration,
       is_low_quality: isLowQuality,
+      ...dims,
     });
 
     // الأرشفة في SharePoint — فقط إن كانت مُهيّأة (وإلا نتجاهلها دون فشل)
